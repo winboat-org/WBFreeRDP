@@ -1070,6 +1070,12 @@ static UINT xf_rail_server_execute_result(RailClientContext* context,
 	xfContext* xfc = (xfContext*)context->custom;
 	WINPR_ASSERT(xfc);
 
+	if (execResult->execResult == RAIL_EXEC_E_SESSION_LOCKED)
+	{
+		WLog_WARN(TAG, "SESSION_LOCKED: keep transport open and await monitored desktop");
+		return CHANNEL_RC_OK;
+	}
+
 	if (execResult->execResult != RAIL_EXEC_S_OK)
 	{
 		WLog_ERR(TAG, "RAIL exec error: execResult=%s [0x%08" PRIx32 "] NtError=0x%X\n",
