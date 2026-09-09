@@ -1,0 +1,49 @@
+--- a/client/X11/xf_rail.h
++++ b/client/X11/xf_rail.h
+@@ -57,6 +57,7 @@
+ 	char* title;
+ 
+ 	UINT32 surfaceId;
++	BOOL hasDesktopContent;
+ 	UINT64 windowId;
+ 	UINT32 ownerWindowId;
+ 
+--- a/client/X11/xf_rail.c
++++ b/client/X11/xf_rail.c
+@@ -460,6 +460,10 @@
+ 			.bottom = WINPR_ASSERTING_INT_CAST(UINT16, extents->bottom - appWindow->y)
+ 		};
+ 
++		/* Only a desktop paint establishes that the primary buffer contains
++		 * this window. Window metadata and Expose events do not supply pixels. */
++		if (appWindow->showState != WINDOW_HIDE)
++			appWindow->hasDesktopContent = TRUE;
+ 		xf_UpdateWindowArea(xfc, appWindow, updateRect.left, updateRect.top,
+ 		                    updateRect.right - updateRect.left, updateRect.bottom - updateRect.top);
+ 	}
+--- a/client/X11/xf_window.c
++++ b/client/X11/xf_window.c
+@@ -1515,7 +1515,9 @@
+ 	height = MIN(height, appWindow->height - y);
+ 	if (width <= 0 || height <= 0)
+ 		return;
+-	if (appWindow->surfaceId < UINT16_MAX)
++	/* Until a window receives desktop pixels or a GFX surface, retain its
++	 * empty backing store instead of importing an obsolete logon desktop. */
++	if ((appWindow->surfaceId < UINT16_MAX) || !appWindow->hasDesktopContent)
+ 	{
+ 		xf_CopyAppArea(xfc, appWindow, x, y, (unsigned)width, (unsigned)height);
+ 		return;
+@@ -1807,7 +1809,11 @@
+ 			return FALSE;
+ 		XGCValues values = WINPR_C_ARRAY_INIT;
+ 		XGetGCValues(xfc->display, appWindow->gc, GCForeground, &values);
+-		XSetForeground(xfc->display, appWindow->gc, xfc->depth == 32 ? 0xff000000UL : 0);
++		/* New ARGB windows have no content yet. Keep them transparent until
++		 * their first paint; retain opaque padding when growing a live window. */
++		const unsigned long background =
++		    (xfc->depth == 32 && appWindow->pixmap) ? 0xff000000UL : 0;
++		XSetForeground(xfc->display, appWindow->gc, background);
+ 		XFillRectangle(xfc->display, next, appWindow->gc, 0, 0, (unsigned)width, (unsigned)height);
+ 		XSetForeground(xfc->display, appWindow->gc, values.foreground);
+ 		if (appWindow->pixmap)

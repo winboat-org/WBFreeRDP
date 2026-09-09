@@ -1,0 +1,37 @@
+{
+  "binarySha256": "98eca24a89be3071eda8d81d5c044707cc1741908cdb0e5d04e373dd915456d7",
+  "builtAtUtc": "2026-09-09T06:57:20.932243+00:00",
+  "patchCount": 17,
+  "sourceFilesCompared": 2940,
+  "localGroupsPassed": 23,
+  "localGroupsFailed": 0,
+  "localStartedAtUtc": "2026-09-09T06:57:26.363715+00:00",
+  "verifiedAtUtc": "2026-09-09T07:01:19.335213+00:00",
+  "integration": {
+    "explorerFocus": {
+      "passAll": true,
+      "clicks": 24,
+      "keyboardChecks": 24,
+      "nativeSwitches": 4,
+      "report": "reports/explorer-focus.md"
+    },
+    "capcutMaximize": {
+      "passAll": true,
+      "linuxCycles": 2,
+      "windowsCycles": 1,
+      "guestPid": 5904,
+      "guestSessionId": 75,
+      "report": "reports/capcut-maximize.md"
+    }
+  },
+  "previous16PatchValidation": {
+    "summary": "reports/validation-summary-16patch.json",
+    "binarySha256": "3ab809fd4e023f171669f68e0826d484a9de6cf8fcebe9f02e48b2b449cd64e3",
+    "notRepeatedForPatch17": [
+      "35-cycle CapCut maximize run",
+      "20-minute reconnect soak",
+      "nine-case typing matrix",
+      "four-case D3D11 matrix"
+    ]
+  }
+}

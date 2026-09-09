@@ -1,0 +1,18 @@
+--- a/client/X11/xf_window.c
++++ b/client/X11/xf_window.c
+@@ -641,11 +641,14 @@
+ 
+ Window xf_CreateDummyWindow(xfContext* xfc)
+ {
++	/* RemoteApp uses this window for clipboard transfers, including INCR chunks. */
++	XSetWindowAttributes attributes = xfc->attribs;
++	attributes.event_mask |= PropertyChangeMask;
+ 	return LogDynAndXCreateWindow(
+ 	    xfc->log, xfc->display, RootWindowOfScreen(xfc->screen),
+ 	    WINPR_ASSERTING_INT_CAST(int, xfc->workArea.x),
+ 	    WINPR_ASSERTING_INT_CAST(int, xfc->workArea.y), 1, 1, 0, xfc->depth, InputOutput,
+-	    xfc->visual, WINPR_ASSERTING_INT_CAST(uint32_t, xfc->attribs_mask), &xfc->attribs);
++	    xfc->visual, WINPR_ASSERTING_INT_CAST(uint32_t, xfc->attribs_mask | CWEventMask), &attributes);
+ }
+ 
+ void xf_DestroyDummyWindow(xfContext* xfc, Window window)

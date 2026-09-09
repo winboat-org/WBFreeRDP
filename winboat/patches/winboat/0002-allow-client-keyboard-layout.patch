@@ -1,0 +1,11 @@
+--- a/guest_server/RDPApps.reg
++++ b/guest_server/RDPApps.reg
+@@ -21,7 +21,7 @@
+ 
+     ; Always use the server's keyboard layout, TODO: Investigate
+     [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Keyboard Layout]
+-    "IgnoreRemoteKeyboardLayout"=dword:00000001
++    "IgnoreRemoteKeyboardLayout"=dword:00000000
+ 
+     ; Disable "Do you want your PC to be discoverable" prompt after each host system reboot
+     [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Network\NewNetworkWindowOff]

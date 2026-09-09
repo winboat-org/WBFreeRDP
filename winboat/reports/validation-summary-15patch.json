@@ -1,0 +1,32 @@
+{
+  "binarySha256": "23d9b9588f8c062e40bcf041432ffcfaf11eea9d6587ff679cde20a8d6347b9d",
+  "builtAtUtc": "2026-09-09T04:56:04.986093+00:00",
+  "patchCount": 15,
+  "sourceFilesCompared": 2940,
+  "localGroupsPassed": 21,
+  "localGroupsFailed": 0,
+  "localStartedAtUtc": "2026-09-09T04:57:19.630426+00:00",
+  "verifiedAtUtc": "2026-09-09T05:27:45.137210+00:00",
+  "integration": {
+    "reconnect": {
+      "pass": true,
+      "cycles": 77,
+      "wallSeconds": 1206.3243960420368,
+      "report": "reports/reconnect-soak.json"
+    },
+    "d3d11": {
+      "pass": true,
+      "cases": 4,
+      "capturedStates": 24,
+      "report": "reports/d3d11-results.json"
+    },
+    "unicodeComposition": {
+      "pass": true,
+      "cases": 9,
+      "seconds": 102.64922713499982,
+      "evidence": "evidence/compose/final15-scoped-live-results.json",
+      "runnerSha256": "60a2f307e8de1a520a40b8090c3c420fffdfb1dc70e32d58ded292d2a99ac301",
+      "ownedSessionsClosed": 9
+    }
+  }
+}

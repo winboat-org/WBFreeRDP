@@ -1,0 +1,7 @@
+/archive/
+/vendor/
+/build/
+/evidence/
+/current-render
+__pycache__/
+*.pyc

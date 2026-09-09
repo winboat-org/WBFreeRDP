@@ -1,0 +1,10 @@
+--- a/src/renderer/lib/winboat.ts
++++ b/src/renderer/lib/winboat.ts
+@@ -79,6 +79,7 @@
+     "/microphone:sys:pulse",
+     "/floatbar",
+     "/compression",
++    "+auto-reconnect",
+     "/sec:tls",
+ ];
+ 

@@ -1,0 +1,82 @@
+{
+  "patches": [
+    {
+      "name": "0001-rail-wait-for-desktop-on-session-locked.patch",
+      "sha256": "b975ae0ac52e2f78dea6e7886fb46765644f772f2910f319d2f2afc67c267a27"
+    },
+    {
+      "name": "0002-x11-remoteapp-reviewed-live-resize.patch",
+      "sha256": "c9b62948a3b43782380bc5f9553dadc129c65a8390f835dd176bd3544aa79f49"
+    },
+    {
+      "name": "0003-x11-resume-and-rail-reconnect.patch",
+      "sha256": "dc18da83bf71669a06a75c4ed15d5afa6be84f89597c0b5cdcc44b60db9ea563"
+    },
+    {
+      "name": "0004-x11-detect-active-keyboard-group.patch",
+      "sha256": "e8aa62f80b12331b21d0cc48dc68ef8d03451b3b158272a65968d10b141c1ba0"
+    },
+    {
+      "name": "0005-x11-avoid-protocol-requests-in-error-handler.patch",
+      "sha256": "007eef0f036a6503f1afc51fbc86f017fa7fd39b3eb1ad1617e29f049b9bd058"
+    },
+    {
+      "name": "0006-x11-send-complete-unicode-input.patch",
+      "sha256": "2c8e582d441b949bdcd2ecde23eff4e3b845e5087ec79318192bf3320de1d8a9"
+    },
+    {
+      "name": "0007-backport-clipboard-request-queue.patch",
+      "sha256": "e877933366af77a9085e38770fea2695c2761af044b45d9649d6f509c79dac95"
+    },
+    {
+      "name": "0008-x11-bound-clipboard-property-requests.patch",
+      "sha256": "8f2af644e7399129c254d291a6daddce347c1f64a34b2974f6eabd7d0a2c8f7c"
+    },
+    {
+      "name": "0009-x11-receive-remoteapp-clipboard-property-events.patch",
+      "sha256": "6fad876a4751d17c7dd3d30e2352ad7560017330a35d6ea952fa9cecfd729ea5"
+    },
+    {
+      "name": "0010-x11-accept-empty-incr-size-hints.patch",
+      "sha256": "c414809bf010a42807b1509c15f23c87e2b9e9efee6062571170bfa341927c5e"
+    },
+    {
+      "name": "0011-x11-preserve-unicode-compose-state.patch",
+      "sha256": "03fbfe1f1d22df146adf6b28002263e994dda5e44005c58642f307b74df08657"
+    },
+    {
+      "name": "0012-x11-bound-resume-clock-sampling-error.patch",
+      "sha256": "5522c47560831ac958011596db4d3138828896d655b7ddee773ca981ff10f492"
+    },
+    {
+      "name": "0013-x11-track-rail-mapping-during-reconnect.patch",
+      "sha256": "f54335bcdd500d7b9a0420499dc949384a9761b8a799683df81c76d091cbe5bf"
+    },
+    {
+      "name": "0014-x11-ignore-cursor-target-after-rail-teardown.patch",
+      "sha256": "43ecd9af5977f0485c21629a3cffa24a4876fd65384ecead65fa7b08cbb29c0f"
+    },
+    {
+      "name": "0015-x11-rebase-pending-resizes-on-late-margins.patch",
+      "sha256": "4c326305874118944ab477819b1bdaae54dc57a832d7e7c6cadfced1c1dcbba9"
+    },
+    {
+      "name": "0016-x11-ignore-invalid-maximum-window-sizes.patch",
+      "sha256": "d6a8d69d864bd8876dfafddaf51ea358477734e91a6d85fd5a4f8278abd59bae"
+    },
+    {
+      "name": "0017-x11-keep-focus-between-remoteapp-windows.patch",
+      "sha256": "2388b78b2580226776f7650821ba3e7ede168e4d496aa329166409a8f63752e2"
+    },
+    {
+      "name": "0018-x11-preserve-remoteapp-alpha-visual.patch",
+      "sha256": "97d527ec92c1f79862cfe52fdfc5f1a2f6250d4c658cfade0cc6f40f31c6783b"
+    },
+    {
+      "name": "0019-x11-wait-for-window-content-before-desktop-repaints.patch",
+      "sha256": "16c31e4623447749350497a1907695769be988652d536b488b10df0e07ec6a29"
+    }
+  ],
+  "comparedFiles": 2940,
+  "differences": []
+}

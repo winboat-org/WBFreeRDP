@@ -1,0 +1,31 @@
+{
+  "binarySha256": "3ab809fd4e023f171669f68e0826d484a9de6cf8fcebe9f02e48b2b449cd64e3",
+  "builtAtUtc": "2026-09-09T05:46:53.002483+00:00",
+  "patchCount": 16,
+  "sourceFilesCompared": 2940,
+  "localGroupsPassed": 22,
+  "localGroupsFailed": 0,
+  "localStartedAtUtc": "2026-09-09T05:48:11.965973+00:00",
+  "verifiedAtUtc": "2026-09-09T06:02:34.006536+00:00",
+  "integration": {
+    "capcutMaximize": {
+      "pass": true,
+      "linuxCycles": 30,
+      "windowsCycles": 5,
+      "checkedTransitions": 70,
+      "guestPid": 5904,
+      "guestSessionId": 75,
+      "earlierOneOffSizeMismatchObserved": true,
+      "report": "reports/capcut-maximize.md"
+    }
+  },
+  "previous15PatchValidation": {
+    "summary": "reports/validation-summary-15patch.json",
+    "binarySha256": "23d9b9588f8c062e40bcf041432ffcfaf11eea9d6587ff679cde20a8d6347b9d",
+    "notRepeatedForPatch16": [
+      "20-minute reconnect soak",
+      "nine-case typing matrix",
+      "four-case D3D11 matrix"
+    ]
+  }
+}

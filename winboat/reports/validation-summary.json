@@ -1,0 +1,35 @@
+{
+  "binarySha256": "270aaa93a98934cae24ba3d0789dcd918ede137a84661f86b305829c982a28f3",
+  "builtAtUtc": "2026-09-09T07:57:46.262158+00:00",
+  "patchCount": 19,
+  "sourceFilesCompared": 2940,
+  "localGroupsPassed": 24,
+  "localGroupsFailed": 0,
+  "localStartedAtUtc": "2026-09-09T07:58:01.047949+00:00",
+  "verifiedAtUtc": "2026-09-09T07:59:42.971974+00:00",
+  "integration": {
+    "tooltipTransparency": {
+      "label": "release-synthetic",
+      "shadowFrames": 613,
+      "shadowWindows": 6,
+      "coloredShadowFrames": 0,
+      "transparentInitialFrames": 15,
+      "depths": [
+        32
+      ],
+      "layeredFrames": 480,
+      "layeredPremultipliedAlphaCorrect": true
+    },
+    "report": "reports/tooltip-transparency.md"
+  },
+  "previous17PatchValidation": {
+    "summary": "reports/validation-summary-17patch.json",
+    "notRepeatedForPatches18And19": [
+      "full Explorer click/keyboard/native-switch matrix",
+      "CapCut maximize cycles",
+      "20-minute reconnect soak",
+      "nine-case typing matrix",
+      "four-case D3D11 matrix"
+    ]
+  }
+}

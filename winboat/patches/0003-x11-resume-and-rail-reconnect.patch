@@ -1,0 +1,231 @@
+diff --git a/client/X11/xf_client.c b/client/X11/xf_client.c
+--- a/client/X11/xf_client.c
++++ b/client/X11/xf_client.c
+@@ -62,6 +62,7 @@
+ #include <string.h>
+ #include <termios.h>
+ #include <pthread.h>
++#include <time.h>
+ #include <sys/wait.h>
+ #include <sys/types.h>
+ #include <sys/select.h>
+@@ -1570,6 +1571,32 @@
+ 	return TRUE;
+ }
+ 
++/* CLOCK_BOOTTIME includes host suspend; CLOCK_MONOTONIC does not. A local
++ * port forwarder can keep the client socket alive after the server has dropped
++ * its connection, so transport errors alone cannot reliably detect resume. */
++static BOOL xf_client_resumed(INT64* suspendOffset)
++{
++#if defined(CLOCK_BOOTTIME)
++	struct timespec boot = { 0 };
++	struct timespec monotonic = { 0 };
++	if ((clock_gettime(CLOCK_BOOTTIME, &boot) != 0) ||
++	    (clock_gettime(CLOCK_MONOTONIC, &monotonic) != 0))
++	{
++		*suspendOffset = -1;
++		return FALSE;
++	}
++
++	const INT64 offset = ((INT64)boot.tv_sec - (INT64)monotonic.tv_sec) * 1000 +
++	                     ((INT64)boot.tv_nsec - (INT64)monotonic.tv_nsec) / 1000000;
++	const BOOL resumed = (*suspendOffset >= 0) && (offset - *suspendOffset >= 1000);
++	*suspendOffset = offset;
++	return resumed;
++#else
++	WINPR_UNUSED(suspendOffset);
++	return FALSE;
++#endif
++}
++
+ /** Main loop for the rdp connection.
+  *  It will be run from the thread's entry point (thread_func()).
+  *  It initiates the connection, and will continue to run until the session ends,
+@@ -1583,6 +1610,8 @@
+ 	DWORD exit_code = 0;
+ 	DWORD waitStatus = 0;
+ 	HANDLE inputEvent = nullptr;
++	INT64 suspendOffset = -1;
++	BOOL monitorResume = FALSE;
+ 
+ 	freerdp* instance = (freerdp*)param;
+ 	WINPR_ASSERT(instance);
+@@ -1628,6 +1657,11 @@
+ 	}
+ 
+ 	inputEvent = xfc->x11event;
++#if defined(CLOCK_BOOTTIME)
++	monitorResume = freerdp_settings_get_bool(settings, FreeRDP_AutoReconnectionEnabled);
++	if (monitorResume)
++		(void)xf_client_resumed(&suspendOffset);
++#endif
+ 
+ 	while (!freerdp_shall_disconnect_context(instance->context))
+ 	{
+@@ -1662,18 +1696,28 @@
+ 		if (xfc->window)
+ 			xf_floatbar_hide_and_show(xfc->window->floatbar);
+ 
++		const DWORD idleTimeout = monitorResume ? 1000 : INFINITE;
+ 		waitStatus = WaitForMultipleObjects(
+ 		    nCount, handles, FALSE,
+-		    xf_rail_has_pending_positions(xfc) ? XF_RAIL_POSITION_INTERVAL_MS : INFINITE);
++		    xf_rail_has_pending_positions(xfc) ? XF_RAIL_POSITION_INTERVAL_MS : idleTimeout);
+ 
+ 		if (waitStatus == WAIT_FAILED)
+ 			break;
+ 
+ 		{
+-			if (!freerdp_check_event_handles(context))
++			/* Process queued server disconnect reasons before considering recovery. */
++			const BOOL connected = freerdp_check_event_handles(context);
++			const BOOL resumed = monitorResume && xf_client_resumed(&suspendOffset);
++			if (resumed)
++				WLog_INFO(TAG, "Host resumed from suspend; reconnecting the RDP transport");
++			if (!connected || resumed)
+ 			{
+ 				if (client_auto_reconnect_ex(instance, handle_window_events))
++				{
++					if (monitorResume)
++						(void)xf_client_resumed(&suspendOffset);
+ 					continue;
++				}
+ 				else
+ 				{
+ 					/*
+diff --git a/client/X11/xf_event.c b/client/X11/xf_event.c
+--- a/client/X11/xf_event.c
++++ b/client/X11/xf_event.c
+@@ -956,6 +956,8 @@
+ 	WINPR_ASSERT(xfc);
+ 	if (!app)
+ 	{
++		if (!xfc->window || event->window != xfc->window->handle)
++			return TRUE;
+ 		if (!gdi_send_suppress_output(xfc->common.context.gdi, FALSE))
+ 			return FALSE;
+ 	}
+@@ -985,10 +987,13 @@
+ 	WINPR_ASSERT(event);
+ 
+ 	if (!app)
++	{
++		/* Delayed events from destroyed RemoteApp windows are not desktop minimize events. */
++		if (!xfc->window || event->window != xfc->window->handle)
++			return TRUE;
+ 		xf_keyboard_release_all_keypress(xfc);
+-
+-	if (!app)
+ 		return gdi_send_suppress_output(xfc->common.context.gdi, TRUE);
++	}
+ 
+ 	{
+ 		xfAppWindow* appWindow = xf_AppWindowFromX11Window(xfc, event->window);
+diff --git a/client/X11/xf_rail.c b/client/X11/xf_rail.c
+--- a/client/X11/xf_rail.c
++++ b/client/X11/xf_rail.c
+@@ -123,6 +123,8 @@
+ 		xfc->window = nullptr;
+ 
+ 		gdi->suppressOutput = old;
++		/* The temporary desktop may have paused updates when it was hidden. */
++		return gdi_send_suppress_output(gdi, FALSE);
+ 	}
+ 	return TRUE;
+ }
+@@ -1111,7 +1113,9 @@
+ 		    freerdp_settings_get_string(context->settings, FreeRDP_RemoteApplicationProgram);
+ 		if ((app != nullptr) && (strnlen(app, 1) > 0))
+ 		{
+-			if (client_rail_server_start_cmd(xfc->rail) != CHANNEL_RC_OK)
++			/* Reconnect state was sent with the handshake, before the window snapshot. */
++			if (!freerdp_settings_get_bool(context->settings, FreeRDP_SessionHasBeenReconnected) &&
++			    (client_rail_server_start_cmd(xfc->rail) != CHANNEL_RC_OK))
+ 				return FALSE;
+ 			if (xf_rail_send_workarea(xfc) != CHANNEL_RC_OK)
+ 				return FALSE;
+@@ -1407,6 +1411,33 @@
+ 	xf_DestroyWindow(appWindow->xfc, appWindow);
+ }
+ 
++static UINT xf_rail_server_handshake(RailClientContext* rail,
++                                     WINPR_ATTR_UNUSED const RAIL_HANDSHAKE_ORDER* serverHandshake)
++{
++	WINPR_ASSERT(rail);
++	const xfContext* xfc = rail->custom;
++	WINPR_ASSERT(xfc);
++	const rdpSettings* settings = xfc->common.context.settings;
++	const RAIL_HANDSHAKE_ORDER handshake = { .buildNumber = freerdp_settings_get_uint32(
++		                                         settings, FreeRDP_ClientBuild) };
++	const UINT status = rail->ClientHandshake(rail, &handshake);
++	if (status != CHANNEL_RC_OK)
++		return status;
++
++	/* Client reconnect state must precede desktop synchronization. This helper
++	 * resends client parameters but does not execute the app on a reconnect. */
++	if (freerdp_settings_get_bool(settings, FreeRDP_SessionHasBeenReconnected))
++		return client_rail_server_start_cmd(rail);
++	return CHANNEL_RC_OK;
++}
++
++static UINT
++xf_rail_server_handshake_ex(RailClientContext* rail,
++                            WINPR_ATTR_UNUSED const RAIL_HANDSHAKE_EX_ORDER* serverHandshake)
++{
++	return xf_rail_server_handshake(rail, nullptr);
++}
++
+ int xf_rail_init(xfContext* xfc, RailClientContext* rail)
+ {
+ 	rdpContext* context = (rdpContext*)xfc;
+@@ -1417,6 +1448,8 @@
+ 	xfc->rail = rail;
+ 	xf_rail_register_update_callbacks(context->update);
+ 	rail->custom = (void*)xfc;
++	rail->ServerHandshake = xf_rail_server_handshake;
++	rail->ServerHandshakeEx = xf_rail_server_handshake_ex;
+ 	rail->ServerExecuteResult = xf_rail_server_execute_result;
+ 	rail->ServerSystemParam = xf_rail_server_system_param;
+ 	rail->ServerLocalMoveSize = xf_rail_server_local_move_size;
+diff --git a/client/X11/xf_window.c b/client/X11/xf_window.c
+--- a/client/X11/xf_window.c
++++ b/client/X11/xf_window.c
+@@ -678,9 +678,11 @@
+ 	window->handle = LogDynAndXCreateWindow(
+ 	    xfc->log, xfc->display, RootWindowOfScreen(xfc->screen),
+ 	    WINPR_ASSERTING_INT_CAST(int, xfc->workArea.x),
+-	    WINPR_ASSERTING_INT_CAST(int, xfc->workArea.y), xfc->workArea.width, xfc->workArea.height,
+-	    0, xfc->depth, InputOutput, xfc->visual,
+-	    WINPR_ASSERTING_INT_CAST(uint32_t, xfc->attribs_mask), &xfc->attribs);
++	    WINPR_ASSERTING_INT_CAST(int, xfc->workArea.y),
++	    xfc->workArea.width ? xfc->workArea.width : (UINT32)MAX(1, width),
++	    xfc->workArea.height ? xfc->workArea.height : (UINT32)MAX(1, height), 0, xfc->depth,
++	    InputOutput, xfc->visual, WINPR_ASSERTING_INT_CAST(uint32_t, xfc->attribs_mask),
++	    &xfc->attribs);
+ 	window->shmid = shm_open(get_shm_id(), (O_CREAT | O_RDWR), (S_IREAD | S_IWRITE));
+ 
+ 	if (window->shmid < 0)
+diff --git a/channels/rail/client/client_rails.c b/channels/rail/client/client_rails.c
+--- a/channels/rail/client/client_rails.c
++++ b/channels/rail/client/client_rails.c
+@@ -19,7 +19,7 @@
+ 	RAIL_CLIENT_STATUS_ORDER clientStatus = { .flags = freerdp_settings_get_uint32(
+ 		                                          settings, FreeRDP_RemoteAppFeatureFlags) };
+ 
+-	if (freerdp_settings_get_bool(settings, FreeRDP_AutoReconnectionEnabled))
++	if (freerdp_settings_get_bool(settings, FreeRDP_SessionHasBeenReconnected))
+ 		clientStatus.flags |= TS_RAIL_CLIENTSTATUS_AUTORECONNECT;
+ 	else
+ 		clientStatus.flags &= ~TS_RAIL_CLIENTSTATUS_AUTORECONNECT;
+@@ -63,6 +63,10 @@
+ 	if (status != CHANNEL_RC_OK)
+ 		return status;
+ 
++	/* Reannounce client settings after reconnect, but keep the existing app. */
++	if (freerdp_settings_get_bool(settings, FreeRDP_SessionHasBeenReconnected))
++		return CHANNEL_RC_OK;
++
+ 	const char* RemoteApplicationFile =
+ 	    freerdp_settings_get_string(settings, FreeRDP_RemoteApplicationFile);
+ 	const char* RemoteApplicationCmdLine =

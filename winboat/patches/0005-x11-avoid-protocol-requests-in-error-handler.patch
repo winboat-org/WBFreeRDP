@@ -1,0 +1,20 @@
+--- a/client/X11/xf_client.c
++++ b/client/X11/xf_client.c
+@@ -926,14 +926,10 @@
+ static int xf_error_handler_ex(Display* d, XErrorEvent* ev)
+ {
+ 	/*
+-	 * ungrab the keyboard, in case a debugger is running in
+-	 * another window. This make xf_error_handler() a potential
+-	 * debugger breakpoint.
++	 * Do not issue X requests from an error callback. With XSynchronize enabled
++	 * (as it is in debug builds), even an ungrab can wait for the request whose
++	 * error we are still processing and deadlock the client.
+ 	 */
+-#if !defined(NDEBUG)
+-	XUngrabKeyboard(d, CurrentTime);
+-	XUngrabPointer(d, CurrentTime);
+-#endif
+ 	return xf_error_handler(d, ev);
+ }
+ 

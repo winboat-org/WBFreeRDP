@@ -1,3 +1,5 @@
+> **WinBoat branch:** see [WINBOAT.md](WINBOAT.md) for the applied fixes, validation, and investigation backlog.
+
 # FreeRDP: A Remote Desktop Protocol Implementation
 
 FreeRDP is a free implementation of the Remote Desktop Protocol (RDP), released under the Apache license.

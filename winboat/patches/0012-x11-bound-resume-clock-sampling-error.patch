@@ -1,0 +1,39 @@
+--- a/client/X11/xf_client.c
++++ b/client/X11/xf_client.c
+@@ -1573,19 +1573,29 @@
+ static BOOL xf_client_resumed(INT64* suspendOffset)
+ {
+ #if defined(CLOCK_BOOTTIME)
++	struct timespec before = { 0 };
+ 	struct timespec boot = { 0 };
+-	struct timespec monotonic = { 0 };
+-	if ((clock_gettime(CLOCK_BOOTTIME, &boot) != 0) ||
+-	    (clock_gettime(CLOCK_MONOTONIC, &monotonic) != 0))
++	struct timespec after = { 0 };
++	if ((clock_gettime(CLOCK_MONOTONIC, &before) != 0) ||
++	    (clock_gettime(CLOCK_BOOTTIME, &boot) != 0) ||
++	    (clock_gettime(CLOCK_MONOTONIC, &after) != 0))
+ 	{
+ 		*suspendOffset = -1;
+ 		return FALSE;
+ 	}
+ 
+-	const INT64 offset = ((INT64)boot.tv_sec - (INT64)monotonic.tv_sec) * 1000 +
+-	                     ((INT64)boot.tv_nsec - (INT64)monotonic.tv_nsec) / 1000000;
+-	const BOOL resumed = (*suspendOffset >= 0) && (offset - *suspendOffset >= 1000);
+-	*suspendOffset = offset;
++	/* Scheduling can delay any clock read. The BOOTTIME-MONOTONIC offset is
++	 * bounded by these two measurements and only increases when suspended.
++	 * Compare a current lower bound with the saved upper bound: preemption
++	 * cannot manufacture a suspend gap. Refine the upper bound between resumes.
++	 */
++	const INT64 lower = ((INT64)boot.tv_sec - (INT64)after.tv_sec) * 1000 +
++	                    ((INT64)boot.tv_nsec - (INT64)after.tv_nsec) / 1000000;
++	const INT64 upper = ((INT64)boot.tv_sec - (INT64)before.tv_sec) * 1000 +
++	                    ((INT64)boot.tv_nsec - (INT64)before.tv_nsec) / 1000000;
++	const BOOL resumed = (*suspendOffset >= 0) && (lower - *suspendOffset >= 1000);
++	if ((*suspendOffset < 0) || resumed || (upper < *suspendOffset))
++		*suspendOffset = upper;
+ 	return resumed;
+ #else
+ 	WINPR_UNUSED(suspendOffset);

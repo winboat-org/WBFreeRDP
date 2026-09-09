@@ -1,0 +1,22 @@
+--- a/client/X11/xf_event.c
++++ b/client/X11/xf_event.c
+@@ -714,7 +714,18 @@
+ 
+ 	xf_keyboard_release_all_keypress(xfc);
+ 	if (app)
+-		return xf_rail_send_activate(xfc, event->window, FALSE);
++	{
++		/* Deactivation activates the server's marker window. A switch between
++		 * windows of this session is handled by the destination's FocusIn. */
++		Window focus = None;
++		int revert = 0;
++		XGetInputFocus(xfc->display, &focus, &revert);
++		xfAppWindow* next = xf_AppWindowFromX11Window(xfc, focus);
++		const BOOL withinSession = (next != nullptr);
++		xf_rail_return_window(next, FALSE);
++		if (!withinSession)
++			return xf_rail_send_activate(xfc, event->window, FALSE);
++	}
+ 
+ 	return TRUE;
+ }
