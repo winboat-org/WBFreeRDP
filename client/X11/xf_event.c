@@ -699,6 +699,7 @@ static BOOL xf_event_FocusIn(xfContext* xfc, const XFocusInEvent* event, BOOL ap
 	}
 
 	xf_keyboard_focus_in(xfc);
+	xf_keyboard_queue_layout(xfc, -1, TRUE);
 	return TRUE;
 }
 
@@ -1237,6 +1238,12 @@ BOOL xf_event_process(freerdp* instance, const XEvent* event)
 
 	rdpSettings* settings = xfc->common.context.settings;
 	WINPR_ASSERT(settings);
+	/* XKB events do not contain a window in the XAnyEvent union position. */
+	if (xfc->xkbAvailable && event->type == xfc->xkbEventBase)
+	{
+		xf_keyboard_handle_layout_event(xfc, event);
+		return TRUE;
+	}
 
 	if (xfc->remote_app)
 	{

@@ -45,6 +45,9 @@ Apply `patches/series` in order to pristine **FreeRDP 3.30.0**:
 | 0022 | Decode packed XI2 raw-motion valuators correctly | New |
 | 0023 | Clip window bounds relative to the desktop origin | New |
 | 0024 | Stop fixed-size dialog tracking hints from causing geometry drift | New |
+| 0025 | Read the live Xwayland keymap when root layout properties are stale | New |
+| 0026 | Synchronize RemoteApp layouts after XKB changes, focus and reconnect | New |
+| 0027 | Preserve queued input groups and deferred forced layout announcements | New |
 
 The first three patches reproduce the previously reviewed resume build.
 `patches/winboat/` contains separate WinBoat integration patches; these do not
@@ -56,6 +59,9 @@ New fixes were compared with upstream commit
 checked against the release tarball, not implied for arbitrary future versions.
 
 ## Findings and evidence
+
+- [Reactive RemoteApp keyboard layouts](reports/reactive-keyboard-layout.md), including held-key handling and live Windows tests.
+- [Xwayland startup layout fix](reports/xwayland-keyboard-layout.md), including the stale US property reproduction and local validation.
 
 - [WinBoat issue-tracker audit](reports/winboat-freerdp-issue-audit.md), including open and closed FreeRDP candidates, existing-patch retests, and prioritized investigations.
 - [Tooltip transparency fix](reports/tooltip-transparency.md), with a reproduced stale sign-in-buffer leak and native alpha tests.

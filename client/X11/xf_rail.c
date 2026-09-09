@@ -28,6 +28,7 @@
 #include <winpr/wlog.h>
 #include <winpr/print.h>
 #include <winpr/sysinfo.h>
+#include <winpr/interlocked.h>
 
 #include <freerdp/client/rail.h>
 
@@ -1435,20 +1436,22 @@ static UINT xf_rail_server_handshake(RailClientContext* rail,
                                      WINPR_ATTR_UNUSED const RAIL_HANDSHAKE_ORDER* serverHandshake)
 {
 	WINPR_ASSERT(rail);
-	const xfContext* xfc = rail->custom;
+	xfContext* xfc = rail->custom;
 	WINPR_ASSERT(xfc);
 	const rdpSettings* settings = xfc->common.context.settings;
 	const RAIL_HANDSHAKE_ORDER handshake = { .buildNumber = freerdp_settings_get_uint32(
 		                                         settings, FreeRDP_ClientBuild) };
-	const UINT status = rail->ClientHandshake(rail, &handshake);
+	UINT status = rail->ClientHandshake(rail, &handshake);
 	if (status != CHANNEL_RC_OK)
 		return status;
 
 	/* Client reconnect state must precede desktop synchronization. This helper
 	 * resends client parameters but does not execute the app on a reconnect. */
 	if (freerdp_settings_get_bool(settings, FreeRDP_SessionHasBeenReconnected))
-		return client_rail_server_start_cmd(rail);
-	return CHANNEL_RC_OK;
+		status = client_rail_server_start_cmd(rail);
+	if (status == CHANNEL_RC_OK)
+		InterlockedExchange(&xfc->keyboardLayoutRailReady, TRUE);
+	return status;
 }
 
 static UINT
@@ -1465,6 +1468,7 @@ int xf_rail_init(xfContext* xfc, RailClientContext* rail)
 	if (!xfc || !rail)
 		return 0;
 
+	InterlockedExchange(&xfc->keyboardLayoutRailReady, FALSE);
 	xfc->rail = rail;
 	xf_rail_register_update_callbacks(context->update);
 	rail->custom = (void*)xfc;
@@ -1506,6 +1510,7 @@ fail:
 int xf_rail_uninit(xfContext* xfc, RailClientContext* rail)
 {
 	WINPR_UNUSED(rail);
+	InterlockedExchange(&xfc->keyboardLayoutRailReady, FALSE);
 
 	if (xfc->rail)
 	{

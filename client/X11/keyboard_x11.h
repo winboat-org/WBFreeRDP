@@ -23,3 +23,6 @@
 #include <freerdp/api.h>
 
 int xf_detect_keyboard_layout_from_xkb(wLog* log, DWORD* keyboardLayoutId);
+
+/* A nonnegative group resolves an event snapshot; -1 queries the current group. */
+int xf_detect_keyboard_layout_from_xkb_group(wLog* log, DWORD* keyboardLayoutId, int group);

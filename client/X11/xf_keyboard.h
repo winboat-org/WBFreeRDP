@@ -25,9 +25,16 @@
 #include "xf_client.h"
 #include "xfreerdp.h"
 
+/* Windows applies RAIL input profiles asynchronously, without an acknowledgement. */
+#define XF_KEYBOARD_LAYOUT_SETTLE_MS 200
+
 BOOL xf_keyboard_init(xfContext* xfc);
 void xf_keyboard_free(xfContext* xfc);
 BOOL xf_keyboard_filter_unicode_event(xfContext* xfc, XEvent* event);
+void xf_keyboard_sync_layout(xfContext* xfc, BOOL force);
+void xf_keyboard_queue_layout(xfContext* xfc, int group, BOOL force);
+void xf_keyboard_flush_layout(xfContext* xfc);
+void xf_keyboard_handle_layout_event(xfContext* xfc, const XEvent* event);
 
 BOOL xf_keyboard_action_script_init(xfContext* xfc);
 

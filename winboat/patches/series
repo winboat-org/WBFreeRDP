@@ -22,3 +22,6 @@
 0022-x11-packed-raw-valuators.patch
 0023-x11-offset-workarea-clipping.patch
 0024-x11-fixed-dialog-size-hints.patch
+0025-x11-xwayland-live-keymap-layout.patch
+0026-x11-reactive-remoteapp-keyboard-layout.patch
+0027-x11-preserve-keyboard-event-order-and-forced-sync.patch

@@ -201,6 +201,15 @@ struct xf_context
 	BOOL mouse_active;
 	BOOL fullscreen_toggle;
 	BOOL KeyboardState[256];
+	BOOL keyboardLayoutAutoInitialized;
+	BOOL keyboardLayoutAuto;
+	BOOL keyboardLayoutPending;
+	BOOL keyboardLayoutForcePending;
+	BOOL keyboardLayoutRefreshPending;
+	int keyboardLayoutGroup;
+	UINT32 keyboardLayoutLastSent;
+	UINT64 keyboardLayoutSettleUntil;
+	LONG keyboardLayoutRailReady;
 	XIM unicodeIM;
 	XIC unicodeIC;
 	Window unicodeWindow;
@@ -299,6 +308,7 @@ struct xf_context
 #endif
 
 	BOOL xkbAvailable;
+	int xkbEventBase;
 	BOOL xrenderAvailable;
 
 	/* value to be sent over wire for each logical client mouse button */

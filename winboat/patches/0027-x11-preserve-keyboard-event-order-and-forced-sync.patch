@@ -1,0 +1,242 @@
+diff --git a/client/X11/keyboard_x11.c b/client/X11/keyboard_x11.c
+index 933bcefd0..836f77d6b 100644
+--- a/client/X11/keyboard_x11.c
++++ b/client/X11/keyboard_x11.c
+@@ -212,8 +212,10 @@ static DWORD kbd_layout_id_from_xwayland(wLog* log, Display* display, unsigned i
+ 	return id;
+ }
+ 
+-int xf_detect_keyboard_layout_from_xkb(wLog* log, DWORD* keyboardLayoutId)
++int xf_detect_keyboard_layout_from_xkb_group(wLog* log, DWORD* keyboardLayoutId, int requestedGroup)
+ {
++	if (requestedGroup < -1 || requestedGroup >= XkbNumKbdGroups)
++		return 0;
+ 	Display* display = XOpenDisplay(nullptr);
+ 
+ 	if (!display)
+@@ -228,7 +230,9 @@ int xf_detect_keyboard_layout_from_xkb(wLog* log, DWORD* keyboardLayoutId)
+ 
+ 	XkbStateRec state = { 0 };
+ 	const unsigned int group =
+-	    (XkbGetState(display, XkbUseCoreKbd, &state) == Success) ? state.group : 0;
++	    (requestedGroup >= 0)
++	        ? (unsigned int)requestedGroup
++	        : ((XkbGetState(display, XkbUseCoreKbd, &state) == Success) ? state.group : 0);
+ 
+ 	/* Wayland sends a compiled keymap, without RMLVO settings. Xwayland's root
+ 	 * rules property can still describe its initial US map; prefer the live map. */
+@@ -247,3 +251,8 @@ int xf_detect_keyboard_layout_from_xkb(wLog* log, DWORD* keyboardLayoutId)
+ 	LogDynAndXCloseDisplay(log, display);
+ 	return (int)id;
+ }
++
++int xf_detect_keyboard_layout_from_xkb(wLog* log, DWORD* keyboardLayoutId)
++{
++	return xf_detect_keyboard_layout_from_xkb_group(log, keyboardLayoutId, -1);
++}
+diff --git a/client/X11/keyboard_x11.h b/client/X11/keyboard_x11.h
+index 1b0a65e9b..a87dbdae3 100644
+--- a/client/X11/keyboard_x11.h
++++ b/client/X11/keyboard_x11.h
+@@ -23,3 +23,6 @@
+ #include <freerdp/api.h>
+ 
+ int xf_detect_keyboard_layout_from_xkb(wLog* log, DWORD* keyboardLayoutId);
++
++/* A nonnegative group resolves an event snapshot; -1 queries the current group. */
++int xf_detect_keyboard_layout_from_xkb_group(wLog* log, DWORD* keyboardLayoutId, int group);
+diff --git a/client/X11/xf_client.c b/client/X11/xf_client.c
+index 9c8119113..afd9454be 100644
+--- a/client/X11/xf_client.c
++++ b/client/X11/xf_client.c
+@@ -550,6 +550,8 @@ static BOOL xf_process_x_events(freerdp* instance)
+ 			XNextEvent(xfc->display, &xevent);
+ 			status = xf_event_process(instance, &xevent);
+ 		}
++		else
++			xf_keyboard_flush_layout(xfc);
+ 		xf_unlock_x11(xfc);
+ 		if (!status)
+ 			break;
+diff --git a/client/X11/xf_event.c b/client/X11/xf_event.c
+index 63b7b7b03..72c6284a6 100644
+--- a/client/X11/xf_event.c
++++ b/client/X11/xf_event.c
+@@ -699,7 +699,7 @@ static BOOL xf_event_FocusIn(xfContext* xfc, const XFocusInEvent* event, BOOL ap
+ 	}
+ 
+ 	xf_keyboard_focus_in(xfc);
+-	xf_keyboard_sync_layout(xfc, TRUE);
++	xf_keyboard_queue_layout(xfc, -1, TRUE);
+ 	return TRUE;
+ }
+ 
+diff --git a/client/X11/xf_keyboard.c b/client/X11/xf_keyboard.c
+index eec307d90..0e2ff6c4e 100644
+--- a/client/X11/xf_keyboard.c
++++ b/client/X11/xf_keyboard.c
+@@ -827,10 +827,13 @@ void xf_keyboard_sync_layout(xfContext* xfc, BOOL force)
+ 	if (!(capabilities & RAIL_LEVEL_LANGUAGE_IME_SYNC_SUPPORTED))
+ 		return;
+ 
++	if (force)
++		xfc->keyboardLayoutForcePending = TRUE;
+ 	UINT32 layout = 0;
+-	if (!xf_detect_keyboard_layout_from_xkb(xfc->log, &layout) || !layout)
++	if (!xf_detect_keyboard_layout_from_xkb_group(xfc->log, &layout, xfc->keyboardLayoutGroup) ||
++	    !layout)
+ 		return;
+-	if (!force && layout == xfc->keyboardLayoutLastSent)
++	if (!xfc->keyboardLayoutForcePending && layout == xfc->keyboardLayoutLastSent)
+ 	{
+ 		xfc->keyboardLayoutPending = FALSE;
+ 		return;
+@@ -862,27 +865,55 @@ void xf_keyboard_sync_layout(xfContext* xfc, BOOL force)
+ 		return;
+ 	}
+ 	xfc->keyboardLayoutPending = FALSE;
++	xfc->keyboardLayoutForcePending = FALSE;
+ 	xfc->keyboardLayoutLastSent = layout;
+ 	/* Windows activates the profile asynchronously, without a RAIL acknowledgement.
+ 	 * Leave a short settling interval before the first subsequent key press. */
+-	xfc->keyboardLayoutSettleUntil = GetTickCount64() + 100;
++	xfc->keyboardLayoutSettleUntil = GetTickCount64() + XF_KEYBOARD_LAYOUT_SETTLE_MS;
+ 	if (!freerdp_settings_set_uint32(settings, FreeRDP_KeyboardLayout, layout))
+ 		WLog_Print(xfc->log, WLOG_WARN, "Could not remember synchronized keyboard layout");
+ 	WLog_Print(xfc->log, WLOG_DEBUG, "Sent keyboard layout 0x%08" PRIx32 " to Windows", layout);
+ }
+ 
++void xf_keyboard_queue_layout(xfContext* xfc, int group, BOOL force)
++{
++	if (!xfc->keyboardLayoutAuto || !xfc->remote_app || group < -1 || group >= XkbNumKbdGroups)
++		return;
++	xfc->keyboardLayoutGroup = group;
++	xfc->keyboardLayoutPending = TRUE;
++	xfc->keyboardLayoutRefreshPending = TRUE;
++	if (force)
++		xfc->keyboardLayoutForcePending = TRUE;
++}
++
++void xf_keyboard_flush_layout(xfContext* xfc)
++{
++	if (!xfc->keyboardLayoutRefreshPending)
++		return;
++	xfc->keyboardLayoutRefreshPending = FALSE;
++	/* XKB notifications can be queued ahead of core key events. Keys resolve
++	 * their own group before input; after draining the queue reconcile the host's
++	 * latest state, including switches with no following key press. */
++	xfc->keyboardLayoutGroup = -1;
++	xf_keyboard_sync_layout(xfc, FALSE);
++}
++
+ void xf_keyboard_handle_layout_event(xfContext* xfc, const XEvent* event)
+ {
++	if (!xfc->keyboardLayoutAuto || !xfc->remote_app)
++		return;
+ 	const XkbEvent* xkb = (const XkbEvent*)event;
+ 	switch (xkb->any.xkb_type)
+ 	{
+ 		case XkbStateNotify:
+ 			if (!(xkb->state.changed & XkbGroupStateMask))
+ 				break;
+-			WINPR_FALLTHROUGH;
++			/* Preserve the event group while draining older queued key events. */
++			xf_keyboard_queue_layout(xfc, xkb->state.group, FALSE);
++			break;
+ 		case XkbNamesNotify:
+ 		case XkbNewKeyboardNotify:
+-			xf_keyboard_sync_layout(xfc, FALSE);
++			xf_keyboard_queue_layout(xfc, -1, FALSE);
+ 			break;
+ 		default:
+ 			break;
+@@ -966,9 +997,10 @@ BOOL xf_keyboard_init(xfContext* xfc)
+ 	if (rc != 0 && !keysym_mapped)
+ 		return FALSE;
+ 
++	xfc->keyboardLayoutGroup = -1;
+ 	const BOOL status = xf_keyboard_update_modifier_map(xfc);
+ 	if (status)
+-		xf_keyboard_sync_layout(xfc, FALSE);
++		xf_keyboard_queue_layout(xfc, -1, FALSE);
+ 	return status;
+ }
+ 
+@@ -976,6 +1008,9 @@ void xf_keyboard_free(xfContext* xfc)
+ {
+ 	xfc->keyboardLayoutLastSent = 0;
+ 	xfc->keyboardLayoutPending = FALSE;
++	xfc->keyboardLayoutForcePending = FALSE;
++	xfc->keyboardLayoutRefreshPending = FALSE;
++	xfc->keyboardLayoutGroup = -1;
+ 	xfc->keyboardLayoutSettleUntil = 0;
+ 	xf_keyboard_unicode_close(xfc);
+ 	xf_keyboard_modifier_map_free(xfc);
+@@ -989,11 +1024,23 @@ void xf_keyboard_key_press(xfContext* xfc, const XKeyEvent* event, KeySym keysym
+ 	WINPR_ASSERT(xfc);
+ 	WINPR_ASSERT(event);
+ 	WINPR_ASSERT(event->keycode < ARRAYSIZE(xfc->KeyboardState));
++	/* A focus/keymap query can see a newer group than this queued key. The
++	 * core key event carries the effective group at the time it was generated. */
++	if (xfc->keyboardLayoutAuto && xfc->remote_app && xfc->xkbAvailable && event->keycode)
++	{
++		const int group = XkbGroupForCoreState(event->state);
++		if (group != xfc->keyboardLayoutGroup || xfc->keyboardLayoutPending ||
++		    xfc->keyboardLayoutForcePending)
++		{
++			xfc->keyboardLayoutGroup = group;
++			xf_keyboard_sync_layout(xfc, FALSE);
++		}
++	}
+ 	if (xfc->keyboardLayoutAuto && !xfc->keyboardLayoutLastSent)
+ 		xf_keyboard_sync_layout(xfc, TRUE);
+ 	const UINT64 now = GetTickCount64();
+ 	if (xfc->keyboardLayoutSettleUntil > now)
+-		Sleep((DWORD)MIN(xfc->keyboardLayoutSettleUntil - now, 100));
++		Sleep((DWORD)MIN(xfc->keyboardLayoutSettleUntil - now, XF_KEYBOARD_LAYOUT_SETTLE_MS));
+ 	xfc->keyboardLayoutSettleUntil = 0;
+ 
+ 	last = xfc->KeyboardState[event->keycode];
+@@ -1016,7 +1063,7 @@ void xf_keyboard_key_release(xfContext* xfc, const XKeyEvent* event, KeySym keys
+ 	xf_keyboard_handle_special_keys_release(xfc, keysym);
+ 	xf_keyboard_send_key(xfc, FALSE, last, event);
+ 	if (xfc->keyboardLayoutPending)
+-		xf_keyboard_sync_layout(xfc, TRUE);
++		xf_keyboard_sync_layout(xfc, FALSE);
+ }
+ 
+ static DWORD get_rdp_scancode_from_x11_keycode(xfContext* xfc, DWORD keycode)
+diff --git a/client/X11/xf_keyboard.h b/client/X11/xf_keyboard.h
+index 709a676fb..362a31567 100644
+--- a/client/X11/xf_keyboard.h
++++ b/client/X11/xf_keyboard.h
+@@ -25,10 +25,15 @@
+ #include "xf_client.h"
+ #include "xfreerdp.h"
+ 
++/* Windows applies RAIL input profiles asynchronously, without an acknowledgement. */
++#define XF_KEYBOARD_LAYOUT_SETTLE_MS 200
++
+ BOOL xf_keyboard_init(xfContext* xfc);
+ void xf_keyboard_free(xfContext* xfc);
+ BOOL xf_keyboard_filter_unicode_event(xfContext* xfc, XEvent* event);
+ void xf_keyboard_sync_layout(xfContext* xfc, BOOL force);
++void xf_keyboard_queue_layout(xfContext* xfc, int group, BOOL force);
++void xf_keyboard_flush_layout(xfContext* xfc);
+ void xf_keyboard_handle_layout_event(xfContext* xfc, const XEvent* event);
+ 
+ BOOL xf_keyboard_action_script_init(xfContext* xfc);
+diff --git a/client/X11/xfreerdp.h b/client/X11/xfreerdp.h
+index 9681a37e2..9b7f0d5fd 100644
+--- a/client/X11/xfreerdp.h
++++ b/client/X11/xfreerdp.h
+@@ -204,6 +204,9 @@ struct xf_context
+ 	BOOL keyboardLayoutAutoInitialized;
+ 	BOOL keyboardLayoutAuto;
+ 	BOOL keyboardLayoutPending;
++	BOOL keyboardLayoutForcePending;
++	BOOL keyboardLayoutRefreshPending;
++	int keyboardLayoutGroup;
+ 	UINT32 keyboardLayoutLastSent;
+ 	UINT64 keyboardLayoutSettleUntil;
+ 	LONG keyboardLayoutRailReady;

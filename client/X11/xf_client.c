@@ -550,6 +550,8 @@ static BOOL xf_process_x_events(freerdp* instance)
 			XNextEvent(xfc->display, &xevent);
 			status = xf_event_process(instance, &xevent);
 		}
+		else
+			xf_keyboard_flush_layout(xfc);
 		xf_unlock_x11(xfc);
 		if (!status)
 			break;
@@ -956,6 +958,7 @@ static void xf_check_extensions(xfContext* context)
 	                      &xkb_minor))
 	{
 		context->xkbAvailable = TRUE;
+		context->xkbEventBase = xkb_event;
 	}
 
 #ifdef WITH_XRENDER
@@ -1231,6 +1234,8 @@ static BOOL xf_pre_connect(freerdp* instance)
 		xfc->remap_table = freerdp_keyboard_remap_string_to_list(KeyboardRemappingList);
 		if (!xfc->remap_table)
 			return FALSE;
+		/* Reannounce the active layout after a transport reconnect as well. */
+		xfc->keyboardLayoutLastSent = 0;
 		if (!xf_keyboard_init(xfc))
 			return FALSE;
 		if (!xf_keyboard_action_script_init(xfc))

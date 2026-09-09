@@ -1,5 +1,10 @@
 # Forward the active Linux keyboard layout
 
+**2026-09-09 follow-up:** [Patch 0025](xwayland-keyboard-layout.md) fixes stale
+Xwayland root properties at startup. WinBoat's registry file and the local VM
+now permit client layouts; the restoration/candidate-only statements below
+describe the original experiment. Live switching remains unsupported.
+
 `0004-x11-detect-active-keyboard-group.patch` fixes startup detection when XKB
 has several layouts. FreeRDP previously always selected group zero from the
 comma-separated layout and variant properties. The patch reads the current XKB

@@ -30,8 +30,11 @@
 #include <winpr/assert.h>
 #include <winpr/cast.h>
 #include <winpr/collections.h>
+#include <winpr/interlocked.h>
+#include <winpr/sysinfo.h>
 
 #include <freerdp/utils/string.h>
+#include <freerdp/channels/channels.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -808,6 +811,115 @@ static void xf_keyboard_unicode_close(xfContext* xfc)
 	xfc->unicodeWindow = None;
 }
 
+void xf_keyboard_sync_layout(xfContext* xfc, BOOL force)
+{
+	rdpContext* context = &xfc->common.context;
+	rdpSettings* settings = context->settings;
+	if (!xfc->keyboardLayoutAuto || !xfc->remote_app || !xfc->focused || !xfc->rail ||
+	    !xfc->rail->ClientLanguageIMEInfo ||
+	    !InterlockedCompareExchange(&xfc->keyboardLayoutRailReady, FALSE, FALSE) ||
+	    freerdp_get_state(context) != CONNECTION_STATE_ACTIVE)
+		return;
+
+	const UINT32 capabilities =
+	    freerdp_settings_get_uint32(settings, FreeRDP_RemoteApplicationSupportLevel) &
+	    freerdp_settings_get_uint32(settings, FreeRDP_RemoteApplicationSupportMask);
+	if (!(capabilities & RAIL_LEVEL_LANGUAGE_IME_SYNC_SUPPORTED))
+		return;
+
+	if (force)
+		xfc->keyboardLayoutForcePending = TRUE;
+	UINT32 layout = 0;
+	if (!xf_detect_keyboard_layout_from_xkb_group(xfc->log, &layout, xfc->keyboardLayoutGroup) ||
+	    !layout)
+		return;
+	if (!xfc->keyboardLayoutForcePending && layout == xfc->keyboardLayoutLastSent)
+	{
+		xfc->keyboardLayoutPending = FALSE;
+		return;
+	}
+
+	/* Releasing a physical key under a different layout can release a different
+	 * Windows virtual key (US Y / German Z), leaving the original key stuck. */
+	xfc->keyboardLayoutPending = TRUE;
+	for (size_t i = 0; i < ARRAYSIZE(xfc->KeyboardState); i++)
+	{
+		if (xfc->KeyboardState[i])
+			return;
+	}
+
+	const RAIL_LANGUAGEIME_INFO_ORDER info = { .ProfileType = TF_PROFILETYPE_KEYBOARDLAYOUT,
+		                                       .LanguageID = layout & 0xFFFF,
+		                                       .KeyboardLayout = layout };
+	const UINT status = xfc->rail->ClientLanguageIMEInfo(xfc->rail, &info);
+	if (status != CHANNEL_RC_OK)
+	{
+		WLog_Print(xfc->log, WLOG_WARN, "Keyboard layout synchronization failed: %" PRIu32, status);
+		return;
+	}
+	/* RAIL writes are queued, while keyboard input is sent immediately. Drain
+	 * the channel queue on this main-thread path before the next keystroke. */
+	if (freerdp_channels_process_pending_messages(context->instance) != 1)
+	{
+		WLog_Print(xfc->log, WLOG_WARN, "Could not flush keyboard layout synchronization");
+		return;
+	}
+	xfc->keyboardLayoutPending = FALSE;
+	xfc->keyboardLayoutForcePending = FALSE;
+	xfc->keyboardLayoutLastSent = layout;
+	/* Windows activates the profile asynchronously, without a RAIL acknowledgement.
+	 * Leave a short settling interval before the first subsequent key press. */
+	xfc->keyboardLayoutSettleUntil = GetTickCount64() + XF_KEYBOARD_LAYOUT_SETTLE_MS;
+	if (!freerdp_settings_set_uint32(settings, FreeRDP_KeyboardLayout, layout))
+		WLog_Print(xfc->log, WLOG_WARN, "Could not remember synchronized keyboard layout");
+	WLog_Print(xfc->log, WLOG_DEBUG, "Sent keyboard layout 0x%08" PRIx32 " to Windows", layout);
+}
+
+void xf_keyboard_queue_layout(xfContext* xfc, int group, BOOL force)
+{
+	if (!xfc->keyboardLayoutAuto || !xfc->remote_app || group < -1 || group >= XkbNumKbdGroups)
+		return;
+	xfc->keyboardLayoutGroup = group;
+	xfc->keyboardLayoutPending = TRUE;
+	xfc->keyboardLayoutRefreshPending = TRUE;
+	if (force)
+		xfc->keyboardLayoutForcePending = TRUE;
+}
+
+void xf_keyboard_flush_layout(xfContext* xfc)
+{
+	if (!xfc->keyboardLayoutRefreshPending)
+		return;
+	xfc->keyboardLayoutRefreshPending = FALSE;
+	/* XKB notifications can be queued ahead of core key events. Keys resolve
+	 * their own group before input; after draining the queue reconcile the host's
+	 * latest state, including switches with no following key press. */
+	xfc->keyboardLayoutGroup = -1;
+	xf_keyboard_sync_layout(xfc, FALSE);
+}
+
+void xf_keyboard_handle_layout_event(xfContext* xfc, const XEvent* event)
+{
+	if (!xfc->keyboardLayoutAuto || !xfc->remote_app)
+		return;
+	const XkbEvent* xkb = (const XkbEvent*)event;
+	switch (xkb->any.xkb_type)
+	{
+		case XkbStateNotify:
+			if (!(xkb->state.changed & XkbGroupStateMask))
+				break;
+			/* Preserve the event group while draining older queued key events. */
+			xf_keyboard_queue_layout(xfc, xkb->state.group, FALSE);
+			break;
+		case XkbNamesNotify:
+		case XkbNewKeyboardNotify:
+			xf_keyboard_queue_layout(xfc, -1, FALSE);
+			break;
+		default:
+			break;
+	}
+}
+
 BOOL xf_keyboard_init(xfContext* xfc)
 {
 	rdpSettings* settings = nullptr;
@@ -838,6 +950,21 @@ BOOL xf_keyboard_init(xfContext* xfc)
 
 	settings = xfc->common.context.settings;
 	WINPR_ASSERT(settings);
+	if (!xfc->keyboardLayoutAutoInitialized)
+	{
+		xfc->keyboardLayoutAuto =
+		    freerdp_settings_get_uint32(settings, FreeRDP_KeyboardLayout) == 0;
+		xfc->keyboardLayoutAutoInitialized = TRUE;
+	}
+	if (xfc->keyboardLayoutAuto && xfc->xkbAvailable)
+	{
+		XkbSelectEventDetails(xfc->display, XkbUseCoreKbd, XkbStateNotify,
+		                      XkbAllStateComponentsMask, XkbGroupStateMask);
+		XkbSelectEventDetails(xfc->display, XkbUseCoreKbd, XkbNamesNotify, XkbAllNamesMask,
+		                      XkbSymbolsNameMask | XkbGroupNamesMask);
+		XkbSelectEvents(xfc->display, XkbUseCoreKbd, XkbNewKeyboardNotifyMask,
+		                XkbNewKeyboardNotifyMask);
+	}
 
 	xf_keyboard_unicode_close(xfc);
 	ZeroMemory(xfc->unicodeKeyHandled, sizeof(xfc->unicodeKeyHandled));
@@ -851,8 +978,9 @@ BOOL xf_keyboard_init(xfContext* xfc)
 	 * 4. Fall back to ENGLISH_UNITED_STATES
 	 */
 	UINT32 KeyboardLayout = freerdp_settings_get_uint32(settings, FreeRDP_KeyboardLayout);
-	if (KeyboardLayout == 0)
+	if (xfc->keyboardLayoutAuto)
 	{
+		KeyboardLayout = 0;
 		xf_detect_keyboard_layout_from_xkb(xfc->log, &KeyboardLayout);
 		if (KeyboardLayout == 0)
 			freerdp_detect_keyboard_layout_from_system_locale(&KeyboardLayout);
@@ -869,11 +997,21 @@ BOOL xf_keyboard_init(xfContext* xfc)
 	if (rc != 0 && !keysym_mapped)
 		return FALSE;
 
-	return xf_keyboard_update_modifier_map(xfc);
+	xfc->keyboardLayoutGroup = -1;
+	const BOOL status = xf_keyboard_update_modifier_map(xfc);
+	if (status)
+		xf_keyboard_queue_layout(xfc, -1, FALSE);
+	return status;
 }
 
 void xf_keyboard_free(xfContext* xfc)
 {
+	xfc->keyboardLayoutLastSent = 0;
+	xfc->keyboardLayoutPending = FALSE;
+	xfc->keyboardLayoutForcePending = FALSE;
+	xfc->keyboardLayoutRefreshPending = FALSE;
+	xfc->keyboardLayoutGroup = -1;
+	xfc->keyboardLayoutSettleUntil = 0;
 	xf_keyboard_unicode_close(xfc);
 	xf_keyboard_modifier_map_free(xfc);
 	xf_keyboard_action_script_free(xfc);
@@ -886,6 +1024,24 @@ void xf_keyboard_key_press(xfContext* xfc, const XKeyEvent* event, KeySym keysym
 	WINPR_ASSERT(xfc);
 	WINPR_ASSERT(event);
 	WINPR_ASSERT(event->keycode < ARRAYSIZE(xfc->KeyboardState));
+	/* A focus/keymap query can see a newer group than this queued key. The
+	 * core key event carries the effective group at the time it was generated. */
+	if (xfc->keyboardLayoutAuto && xfc->remote_app && xfc->xkbAvailable && event->keycode)
+	{
+		const int group = XkbGroupForCoreState(event->state);
+		if (group != xfc->keyboardLayoutGroup || xfc->keyboardLayoutPending ||
+		    xfc->keyboardLayoutForcePending)
+		{
+			xfc->keyboardLayoutGroup = group;
+			xf_keyboard_sync_layout(xfc, FALSE);
+		}
+	}
+	if (xfc->keyboardLayoutAuto && !xfc->keyboardLayoutLastSent)
+		xf_keyboard_sync_layout(xfc, TRUE);
+	const UINT64 now = GetTickCount64();
+	if (xfc->keyboardLayoutSettleUntil > now)
+		Sleep((DWORD)MIN(xfc->keyboardLayoutSettleUntil - now, XF_KEYBOARD_LAYOUT_SETTLE_MS));
+	xfc->keyboardLayoutSettleUntil = 0;
 
 	last = xfc->KeyboardState[event->keycode];
 	xfc->KeyboardState[event->keycode] = (event->keycode != 0);
@@ -906,6 +1062,8 @@ void xf_keyboard_key_release(xfContext* xfc, const XKeyEvent* event, KeySym keys
 	xfc->KeyboardState[event->keycode] = FALSE;
 	xf_keyboard_handle_special_keys_release(xfc, keysym);
 	xf_keyboard_send_key(xfc, FALSE, last, event);
+	if (xfc->keyboardLayoutPending)
+		xf_keyboard_sync_layout(xfc, FALSE);
 }
 
 static DWORD get_rdp_scancode_from_x11_keycode(xfContext* xfc, DWORD keycode)
