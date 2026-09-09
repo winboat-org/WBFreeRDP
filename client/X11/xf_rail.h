@@ -57,6 +57,7 @@ struct xf_app_window
 	char* title;
 
 	UINT32 surfaceId;
+	BOOL hasDesktopContent;
 	UINT64 windowId;
 	UINT32 ownerWindowId;
 

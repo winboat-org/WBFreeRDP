@@ -1495,7 +1495,9 @@ void xf_UpdateWindowArea(xfContext* xfc, xfAppWindow* appWindow, int x, int y, i
 	height = MIN(height, appWindow->height - y);
 	if (width <= 0 || height <= 0)
 		return;
-	if (appWindow->surfaceId < UINT16_MAX)
+	/* Until a window receives desktop pixels or a GFX surface, retain its
+	 * empty backing store instead of importing an obsolete logon desktop. */
+	if ((appWindow->surfaceId < UINT16_MAX) || !appWindow->hasDesktopContent)
 	{
 		xf_CopyAppArea(xfc, appWindow, x, y, (unsigned)width, (unsigned)height);
 		return;
@@ -1774,7 +1776,11 @@ BOOL xf_AppWindowResize(xfContext* xfc, xfAppWindow* appWindow)
 			return FALSE;
 		XGCValues values = WINPR_C_ARRAY_INIT;
 		XGetGCValues(xfc->display, appWindow->gc, GCForeground, &values);
-		XSetForeground(xfc->display, appWindow->gc, xfc->depth == 32 ? 0xff000000UL : 0);
+		/* New ARGB windows have no content yet. Keep them transparent until
+		 * their first paint; retain opaque padding when growing a live window. */
+		const unsigned long background =
+		    (xfc->depth == 32 && appWindow->pixmap) ? 0xff000000UL : 0;
+		XSetForeground(xfc->display, appWindow->gc, background);
 		XFillRectangle(xfc->display, next, appWindow->gc, 0, 0, (unsigned)width, (unsigned)height);
 		XSetForeground(xfc->display, appWindow->gc, values.foreground);
 		if (appWindow->pixmap)

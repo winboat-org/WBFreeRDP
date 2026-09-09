@@ -456,6 +456,10 @@ BOOL xf_rail_paint_surface(xfContext* xfc, UINT64 windowId, const RECTANGLE_16* 
 			.bottom = WINPR_ASSERTING_INT_CAST(UINT16, extents->bottom - appWindow->y)
 		};
 
+		/* Only a desktop paint establishes that the primary buffer contains
+		 * this window. Window metadata and Expose events do not supply pixels. */
+		if (appWindow->showState != WINDOW_HIDE)
+			appWindow->hasDesktopContent = TRUE;
 		xf_UpdateWindowArea(xfc, appWindow, updateRect.left, updateRect.top,
 		                    updateRect.right - updateRect.left, updateRect.bottom - updateRect.top);
 	}
