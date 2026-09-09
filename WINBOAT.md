@@ -9,10 +9,14 @@ history and licenses are preserved. The existing `master` branch is unchanged.
 - [Five follow-up fixes and remaining issues](winboat/reports/issue-fixes.md)
 - [Issue tracker investigation backlog](winboat/reports/winboat-freerdp-issue-audit.md)
 - [Local regression fixtures and scripts](winboat/README.md)
+- [Portable musl build and SoLo VA-API support](packaging/musl/README.md)
 
-The linked local build was checked with 30 build/test groups. The published
-changed source files match that tested tree byte for byte. Full-stack builds
-should use the upstream CMake instructions; the scripts under `winboat/` are
-lab runners with additional documented local dependencies, not a packaging system.
-No binary release or system installation is included. WinBoat integration changes
-are saved separately under `winboat/patches/winboat/`.
+The original RemoteApp fixes were checked with 30 build/test groups. The scripts
+under `winboat/` remain lab runners with additional documented dependencies.
+`packaging/musl/` adds a complete static client build, runtime dependency checks and
+optional hardware decoding through the host's VA-API driver. Its validation and
+limitations are documented separately. The Portable WBFreeRDP workflow builds
+development artifacts on this branch and on `winboat-3.30.*` tags. Release publishing
+is manual. See the portable build documentation for remaining distribution work.
+WinBoat application integration changes are saved separately under
+`winboat/patches/winboat/`.

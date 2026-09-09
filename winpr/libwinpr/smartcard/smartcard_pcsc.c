@@ -52,6 +52,16 @@
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 #endif
 
+#if defined(WITH_WBFREERDP_PCSC_STATIC)
+/* The portable archive namespaces pcsc-lite's symbols to keep its LP64 API
+ * separate from WinPR's Windows-compatible API with the same public names. */
+#define WINSCARD_LOAD_PROC_EX(module, pcsc, _fname, _name)    \
+	do                                                        \
+	{                                                         \
+		extern __typeof__(*pcsc.pfn##_fname) wb_pcsc_##_name; \
+		pcsc.pfn##_fname = wb_pcsc_##_name;                   \
+	} while (0)
+#else
 #define WINSCARD_LOAD_PROC_EX(module, pcsc, _fname, _name)                   \
 	do                                                                       \
 	{                                                                        \
@@ -60,6 +70,7 @@
 		pcsc.pfn##_fname = GetProcAddressAs(module, #_name, fnPCSC##_fname); \
 		WINPR_PRAGMA_DIAG_POP                                                \
 	} while (0)
+#endif
 
 #define WINSCARD_LOAD_PROC(module, pcsc, _name) WINSCARD_LOAD_PROC_EX(module, pcsc, _name, _name)
 
@@ -125,7 +136,7 @@
  * any operation using hCtx2 (and hCard2) will also be blocked.
  */
 
-//#define DISABLE_PCSC_SCARD_AUTOALLOCATE
+// #define DISABLE_PCSC_SCARD_AUTOALLOCATE
 #include "smartcard_pcsc.h"
 
 #define PCSC_SCARD_PCI_T0 (&g_PCSC_rgSCardT0Pci)
@@ -217,7 +228,9 @@ typedef struct
 	SCARDCONTEXT hSharedContext;
 } PCSC_SCARDHANDLE;
 
+#if !defined(WITH_WBFREERDP_PCSC_STATIC)
 static HMODULE g_PCSCModule = nullptr;
+#endif
 static PCSCFunctionTable g_PCSC = WINPR_C_ARRAY_INIT;
 
 static HANDLE g_StartedEvent = nullptr;
@@ -3513,6 +3526,7 @@ int PCSC_InitializeSCardApi(void)
 {
 	/* Disable pcsc-lite's (poor) blocking so we can handle it ourselves */
 	SetEnvironmentVariableA("PCSCLITE_NO_BLOCKING", "1");
+#if !defined(WITH_WBFREERDP_PCSC_STATIC)
 #ifdef __MACOSX__
 	g_PCSCModule = LoadLibraryX("/System/Library/Frameworks/PCSC.framework/PCSC");
 	OSXVersion = determineMacOSXVersion();
@@ -3530,6 +3544,7 @@ int PCSC_InitializeSCardApi(void)
 
 	if (!g_PCSCModule)
 		return -1;
+#endif
 
 		/* symbols defined in winpr/smartcard.h, might pose an issue with the GetProcAddress macro
 		 * below. therefore undefine them here */

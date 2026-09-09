@@ -736,6 +736,14 @@ static BOOL libavcodec_init(H264_CONTEXT* h264)
 
 #ifdef WITH_VAAPI
 
+		/* Also permits a portable client's startup probe to select software decoding. */
+		const char* vaapiMode = getenv("FREERDP_VAAPI_MODE");
+		if (vaapiMode && (strcmp(vaapiMode, "off") == 0))
+		{
+			WLog_Print(h264->log, WLOG_INFO, "VAAPI disabled; using software H264 decoding");
+			goto fail_hwdevice_create;
+		}
+
 		if (!sys->hwctx)
 		{
 			int ret = av_hwdevice_ctx_create(&sys->hwctx, AV_HWDEVICE_TYPE_VAAPI,

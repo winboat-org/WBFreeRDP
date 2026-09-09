@@ -1,0 +1,17 @@
+FROM alpine:3.23@sha256:1beb0dc0a51de7ff38e3b5274078a2e0b81113ba5c7535e1a03d5913a5edbda3
+RUN apk add --no-cache \
+    build-base cmake ninja pkgconf git python3 curl linux-headers \
+    meson nasm autoconf automake libtool \
+    openssl-dev openssl-libs-static zlib-dev zlib-static \
+    libx11-dev libx11-static libxcb-dev libxcb-static \
+    libxext-dev libxext-static libxi-dev libxi-static libxrandr-dev \
+    libxcursor-dev libxinerama-dev libxrender-dev libxfixes-dev libxkbfile-dev \
+    libxtst-dev libxtst-static libxau-dev \
+    libjpeg-turbo-dev libjpeg-turbo-static \
+    libpng-dev libpng-static \
+    libxkbcommon-dev libxkbcommon-static fuse3-dev fuse3-static \
+    pcsc-lite-dev pcsc-lite-static icu-dev icu-static \
+    libsndfile-dev libsndfile-static flac-static libogg-static libvorbis-static \
+    gettext-dev gettext-static
+WORKDIR /work
+ENTRYPOINT ["python3", "/src/packaging/musl/build.py"]

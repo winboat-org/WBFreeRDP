@@ -1,0 +1,128 @@
+{
+  "date": "2026-09-09",
+  "executableSha256": "f4cf74b9d80a150e4e33e4b00416268757edd732d2855a710c021b3b57f9e950",
+  "executableBytes": 24019936,
+  "sourceBase": "8320b2728c172a6d5a25281b4b0abe2c3100fcc6",
+  "sourceDirty": true,
+  "softwareDecode": {
+    "frames": 8,
+    "hardwareFrames": 0,
+    "sha256": "315fba6bbc56edaab57501867d9934a198f5d1531e16c817ca727c6cdda48424"
+  },
+  "containers": [
+    {
+      "image": "localhost/wbfreerdp-scratch-smoke:437627",
+      "version": "This is FreeRDP version 3.30.0 (8320b2728)",
+      "decode": {
+        "frames": 8,
+        "hardwareFrames": 0,
+        "sha256": "315fba6bbc56edaab57501867d9934a198f5d1531e16c817ca727c6cdda48424"
+      },
+      "runtime": {
+        "md4": true,
+        "png": true,
+        "jpeg": true,
+        "smartcardStatus": "0x8010001d"
+      }
+    },
+    {
+      "image": "docker.io/library/alpine:3.23",
+      "version": "This is FreeRDP version 3.30.0 (8320b2728)",
+      "decode": {
+        "frames": 8,
+        "hardwareFrames": 0,
+        "sha256": "315fba6bbc56edaab57501867d9934a198f5d1531e16c817ca727c6cdda48424"
+      },
+      "runtime": {
+        "md4": true,
+        "png": true,
+        "jpeg": true,
+        "smartcardStatus": "0x8010001d"
+      }
+    },
+    {
+      "image": "docker.io/library/ubuntu:22.04",
+      "version": "This is FreeRDP version 3.30.0 (8320b2728)",
+      "decode": {
+        "frames": 8,
+        "hardwareFrames": 0,
+        "sha256": "315fba6bbc56edaab57501867d9934a198f5d1531e16c817ca727c6cdda48424"
+      },
+      "runtime": {
+        "md4": true,
+        "png": true,
+        "jpeg": true,
+        "smartcardStatus": "0x8010001d"
+      }
+    },
+    {
+      "image": "docker.io/library/debian:12",
+      "version": "This is FreeRDP version 3.30.0 (8320b2728)",
+      "decode": {
+        "frames": 8,
+        "hardwareFrames": 0,
+        "sha256": "315fba6bbc56edaab57501867d9934a198f5d1531e16c817ca727c6cdda48424"
+      },
+      "runtime": {
+        "md4": true,
+        "png": true,
+        "jpeg": true,
+        "smartcardStatus": "0x8010001d"
+      }
+    },
+    {
+      "image": "quay.io/fedora/fedora:44",
+      "version": "This is FreeRDP version 3.30.0 (8320b2728)",
+      "decode": {
+        "frames": 8,
+        "hardwareFrames": 0,
+        "sha256": "315fba6bbc56edaab57501867d9934a198f5d1531e16c817ca727c6cdda48424"
+      },
+      "runtime": {
+        "md4": true,
+        "png": true,
+        "jpeg": true,
+        "smartcardStatus": "0x8010001d"
+      }
+    }
+  ],
+  "softwareRemoteApp": {
+    "pass": true,
+    "elapsedSeconds": 71.93770310695982,
+    "cycles": 4,
+    "networkCuts": 2,
+    "sameGuestProcess": true,
+    "unicode": true,
+    "initialResources": {
+      "rssKiB": 86024,
+      "fileDescriptors": 61
+    },
+    "finalResources": {
+      "rssKiB": 86984,
+      "fileDescriptors": 61
+    }
+  },
+  "audioAndDrive": {
+    "name": "musl-ab76ab97",
+    "pass": true,
+    "guest": {
+      "pid": 5308,
+      "driveRoundTrip": true,
+      "playbackRequested": true,
+      "microphoneSamples": 132300,
+      "microphoneRms": 8068.644592319895,
+      "microphonePeak": 15141,
+      "microphonePositiveCrossings": 2326,
+      "pass": true
+    },
+    "playback": {
+      "samples": 393216,
+      "peak": 12061,
+      "rms": 8496.1924913084,
+      "power880Hz": 36146145.72978128,
+      "power440Hz": 149.74787945691946
+    }
+  },
+  "liveHardwareLog": "Using VAAPI for accelerated H264 decoding",
+  "hostGpu": "AMD Radeon RX 6600 (Mesa radeonsi)"
+}
