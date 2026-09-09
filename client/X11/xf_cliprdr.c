@@ -63,6 +63,7 @@ typedef struct
 	UINT32 localFormat;
 	char* formatName;
 	BOOL isImage;
+	BOOL available;
 } xfCliprdrFormat;
 
 typedef struct
@@ -387,6 +388,11 @@ static const xfCliprdrFormat* xf_cliprdr_get_client_format_by_id(xfClipboard* cl
 	{
 		const xfCliprdrFormat* format = &(clipboard->clientFormats[index]);
 
+		/* Several X11 MIME types map to one Windows format. Request only
+		 * a target advertised by the current clipboard owner. */
+		if ((formatId != CF_RAW) && !format->available)
+			continue;
+
 		if (fetchImage && format->isImage)
 			return format;
 
@@ -687,6 +693,24 @@ static BOOL xf_cliprdr_should_add_format(const CLIPRDR_FORMAT* formats, size_t c
 	return TRUE;
 }
 
+static void xf_cliprdr_set_available_targets(xfClipboard* clipboard, const Atom* targets,
+                                              size_t count)
+{
+	for (size_t i = 0; i < clipboard->numClientFormats; i++)
+	{
+		xfCliprdrFormat* format = &clipboard->clientFormats[i];
+		format->available = FALSE;
+		for (size_t j = 0; j < count; j++)
+		{
+			if (format->atom == targets[j])
+			{
+				format->available = TRUE;
+				break;
+			}
+		}
+	}
+}
+
 static CLIPRDR_FORMAT* xf_cliprdr_get_formats_from_targets(xfClipboard* clipboard,
                                                            UINT32* numFormats)
 {
@@ -704,6 +728,7 @@ static CLIPRDR_FORMAT* xf_cliprdr_get_formats_from_targets(xfClipboard* clipboar
 	WINPR_ASSERT(xfc);
 
 	*numFormats = 0;
+	xf_cliprdr_set_available_targets(clipboard, nullptr, 0);
 	LogDynAndXGetWindowProperty(xfc->log, xfc->display, xfc->drawable, clipboard->property_atom, 0,
 	                            200, 0, XA_ATOM, &atom, &format_property, &proplength, &bytes_left,
 	                            &data);
@@ -723,6 +748,8 @@ static CLIPRDR_FORMAT* xf_cliprdr_get_formats_from_targets(xfClipboard* clipboar
 			goto out;
 		}
 	}
+
+	xf_cliprdr_set_available_targets(clipboard, (const Atom*)data, proplength);
 
 	{
 		BOOL isImage = FALSE;
