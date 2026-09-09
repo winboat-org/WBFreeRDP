@@ -251,6 +251,9 @@ static Window xf_Pointer_get_window(xfContext* xfc)
 	if (xfc->remote_app)
 	{
 		Window w = 0;
+		/* Queued focus events can arrive after RAIL teardown during a reconnect retry. */
+		if (!xfc->railWindows)
+			return 0;
 		xf_AppWindowsLock(xfc);
 		if (!xfc->appWindow)
 			WLog_WARN(TAG, "xf_Pointer: Invalid appWindow");
