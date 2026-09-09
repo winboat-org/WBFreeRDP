@@ -612,7 +612,9 @@ BOOL xf_create_window(xfContext* xfc)
 	const XSetWindowAttributes empty = WINPR_C_ARRAY_INIT;
 	xfc->attribs = empty;
 
-	if (xfc->remote_app)
+	/* A RemoteApp connection can temporarily show the logon desktop. Keep
+	 * its alpha visual so later remote windows still support transparency. */
+	if (freerdp_settings_get_bool(settings, FreeRDP_RemoteApplicationMode))
 		xfc->depth = 32;
 	else
 		xfc->depth = DefaultDepthOfScreen(xfc->screen);
