@@ -1065,17 +1065,18 @@ static BOOL xf_cliprdr_get_requested_data(xfClipboard* clipboard, Atom target)
 
 	size_t len = 0;
 
-	/* No data, empty return */
-	if ((total_bytes <= 0) && !clipboard->incr_starts)
-	{
-		xf_cliprdr_stop_incr(clipboard);
-	}
-	/* We have to read incremental updates */
-	else if (type == clipboard->incr_atom)
+	/* An INCR marker starts a transfer even when its size hint is empty (xclip).
+	 * Check the type before treating a zero-length property as an empty result. */
+	if (type == clipboard->incr_atom)
 	{
 		xf_cliprdr_stop_incr(clipboard);
 		clipboard->incr_starts = TRUE;
 		has_data = TRUE; /* data will follow in PropertyNotify event */
+	}
+	/* No data, empty return */
+	else if ((total_bytes <= 0) && !clipboard->incr_starts)
+	{
+		xf_cliprdr_stop_incr(clipboard);
 	}
 	else
 	{
