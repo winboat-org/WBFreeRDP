@@ -4,11 +4,13 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import platform
 import shutil
 import subprocess
 import tarfile
+from distribution import collect as collect_distribution
 
 SOURCE = Path('/src')
 CONFIG = SOURCE / 'packaging/musl'
@@ -81,6 +83,7 @@ for entry in LOCK['archives']:
 
 checkout('solo', SOLO)
 checkout('libva', SOURCES / 'libva')
+checkout('aports', WORK / 'aports')
 run('./build', '-j', JOBS, cwd=SOLO)
 
 for name in ('libXau-1.0.12', 'libXrandr-1.5.4'):
@@ -247,6 +250,15 @@ for name, root in roots.items():
         for path in root.glob(pattern):
             if path.is_file():
                 shutil.copy2(path, destination / path.name)
+# Preserve notices from SoLo's vendored components as well as its top-level license.
+solo_files = run('git', '-C', SOLO, 'ls-files', '-z', capture=True).split('\0')
+for relative in solo_files:
+    if relative and re.match(r'(?i)^(licen[cs]e|copying|copyright|notice)([.\-_].*)?$', Path(relative).name):
+        path = SOLO / relative
+        if path.is_file():
+            destination = notices / 'SoLo' / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, destination)
 if Path('/usr/share/licenses').exists():
     shutil.copytree('/usr/share/licenses', notices / 'alpine', dirs_exist_ok=True)
 
@@ -265,10 +277,31 @@ with tarfile.open(source_stage / 'freerdp.tar.gz', 'w:gz') as archive:
         path = SOURCE / relative
         if path.is_file() or path.is_symlink():
             archive.add(path, arcname='freerdp/' + relative, recursive=False)
+relink = collect_distribution(WORK, CONFIG, PACKAGE, source_stage, LOCK['aports']['commit'])
 shutil.copy2(PACKAGE / 'manifest.json', source_stage / 'manifest.json')
+(PACKAGE / 'SOURCES.md').write_text('''# WBFreeRDP sources and modifications
+
+This executable contains FreeRDP, SoLo and the libraries listed in manifest.json.
+Original license notices are included under licenses/. Alpine source versions,
+recipe revisions and archive checksums are recorded in alpine-sources.json.
+
+The corresponding source bundle and relinking kit accompany the binary at:
+https://github.com/winboat-org/WBFreeRDP/releases/tag/winboat-3.30.0-1
+
+- wbfreerdp-sources.tar.gz: complete FreeRDP and SoLo sources, original dependency
+  archives, and the matching Alpine upstream sources with build recipes/patches.
+- wbfreerdp-relink-linux-x64.tar.gz: client object files, static libraries, the
+  relink command and instructions for substituting modified libraries.
+
+The source bundle includes the build/installation scripts and dependency pins.
+The installed runtime can be replaced with a modified build; WinBoat's optional
+system FreeRDP setting can also launch a modified client. See the relinking kit's
+README.md for instructions. Preserve these notices and source access when
+redistributing this executable.
+''')
 
 for directory, name in ((PACKAGE, f'wbfreerdp-linux-{ARCH}'), (TESTS, f'wbfreerdp-tests-linux-{ARCH}'),
-                        (source_stage, 'wbfreerdp-sources')):
+                        (source_stage, 'wbfreerdp-sources'), (relink, f'wbfreerdp-relink-linux-{ARCH}')):
     with tarfile.open(ARTIFACTS / (name + '.tar.gz'), 'w:gz') as archive:
         archive.add(directory, arcname=directory.name)
 with tarfile.open(ARTIFACTS / f'wbfreerdp-debug-linux-{ARCH}.tar.gz', 'w:gz') as archive:

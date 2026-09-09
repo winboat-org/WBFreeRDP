@@ -1,13 +1,52 @@
 {
-  "solo": { "repository": "https://github.com/pg83/solo.git", "commit": "f07af9b89676336c0fd059d225ee81d7b5473d3e" },
-  "libva": { "repository": "https://github.com/intel/libva.git", "commit": "dbf83dc3b1ce6bad46e1628aaf2da5ef731157b8", "version": "2.23.0" },
+  "solo": {
+    "repository": "https://github.com/pg83/solo.git",
+    "commit": "f07af9b89676336c0fd059d225ee81d7b5473d3e"
+  },
+  "libva": {
+    "repository": "https://github.com/intel/libva.git",
+    "commit": "dbf83dc3b1ce6bad46e1628aaf2da5ef731157b8",
+    "version": "2.23.0"
+  },
   "archives": [
-    { "directory": "libXau-1.0.12", "url": "https://www.x.org/releases/individual/lib/libXau-1.0.12.tar.xz", "sha256": "74d0e4dfa3d39ad8939e99bda37f5967aba528211076828464d2777d477fc0fb" },
-    { "directory": "libXrandr-1.5.4", "url": "https://www.x.org/releases/individual/lib/libXrandr-1.5.4.tar.xz", "sha256": "1ad5b065375f4a85915aa60611cc6407c060492a214d7f9daf214be752c3b4d3" },
-    { "directory": "libdrm-2.4.124", "url": "https://dri.freedesktop.org/libdrm/libdrm-2.4.124.tar.xz", "sha256": "ac36293f61ca4aafaf4b16a2a7afff312aa4f5c37c9fbd797de9e3c0863ca379" },
-    { "directory": "ffmpeg-8.0.1", "url": "https://ffmpeg.org/releases/ffmpeg-8.0.1.tar.xz", "sha256": "05ee0b03119b45c0bdb4df654b96802e909e0a752f72e4fe3794f487229e5a41" },
-    { "directory": "opus-1.5.2", "url": "https://downloads.xiph.org/releases/opus/opus-1.5.2.tar.gz", "sha256": "65c1d2f78b9f2fb20082c38cbe47c951ad5839345876e46941612ee87f9a7ce1" },
-    { "directory": "pulseaudio-17.0", "url": "https://www.freedesktop.org/software/pulseaudio/releases/pulseaudio-17.0.tar.xz", "sha256": "053794d6671a3e397d849e478a80b82a63cb9d8ca296bd35b73317bb5ceb87b5" },
-    { "directory": "cups-2.4.14", "url": "https://github.com/OpenPrinting/cups/releases/download/v2.4.14/cups-2.4.14-source.tar.gz", "sha256": "660288020dd6f79caf799811c4c1a3207a48689899ac2093959d70a3bdcb7699" }
-  ]
+    {
+      "directory": "libXau-1.0.12",
+      "url": "https://www.x.org/releases/individual/lib/libXau-1.0.12.tar.xz",
+      "sha256": "74d0e4dfa3d39ad8939e99bda37f5967aba528211076828464d2777d477fc0fb"
+    },
+    {
+      "directory": "libXrandr-1.5.4",
+      "url": "https://www.x.org/releases/individual/lib/libXrandr-1.5.4.tar.xz",
+      "sha256": "1ad5b065375f4a85915aa60611cc6407c060492a214d7f9daf214be752c3b4d3"
+    },
+    {
+      "directory": "libdrm-2.4.124",
+      "url": "https://dri.freedesktop.org/libdrm/libdrm-2.4.124.tar.xz",
+      "sha256": "ac36293f61ca4aafaf4b16a2a7afff312aa4f5c37c9fbd797de9e3c0863ca379"
+    },
+    {
+      "directory": "ffmpeg-8.0.1",
+      "url": "https://ffmpeg.org/releases/ffmpeg-8.0.1.tar.xz",
+      "sha256": "05ee0b03119b45c0bdb4df654b96802e909e0a752f72e4fe3794f487229e5a41"
+    },
+    {
+      "directory": "opus-1.5.2",
+      "url": "https://downloads.xiph.org/releases/opus/opus-1.5.2.tar.gz",
+      "sha256": "65c1d2f78b9f2fb20082c38cbe47c951ad5839345876e46941612ee87f9a7ce1"
+    },
+    {
+      "directory": "pulseaudio-17.0",
+      "url": "https://www.freedesktop.org/software/pulseaudio/releases/pulseaudio-17.0.tar.xz",
+      "sha256": "053794d6671a3e397d849e478a80b82a63cb9d8ca296bd35b73317bb5ceb87b5"
+    },
+    {
+      "directory": "cups-2.4.14",
+      "url": "https://github.com/OpenPrinting/cups/releases/download/v2.4.14/cups-2.4.14-source.tar.gz",
+      "sha256": "660288020dd6f79caf799811c4c1a3207a48689899ac2093959d70a3bdcb7699"
+    }
+  ],
+  "aports": {
+    "repository": "https://github.com/alpinelinux/aports.git",
+    "commit": "67c786fbc92f4585e974f7eea588efabbf13fa05"
+  }
 }

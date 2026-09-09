@@ -1,7 +1,7 @@
 FROM alpine:3.23@sha256:1beb0dc0a51de7ff38e3b5274078a2e0b81113ba5c7535e1a03d5913a5edbda3
 RUN apk add --no-cache \
     build-base cmake ninja pkgconf git python3 curl linux-headers \
-    meson nasm autoconf automake libtool \
+    meson nasm autoconf automake libtool abuild \
     openssl-dev openssl-libs-static zlib-dev zlib-static \
     libx11-dev libx11-static libxcb-dev libxcb-static \
     libxext-dev libxext-static libxi-dev libxi-static libxrandr-dev \

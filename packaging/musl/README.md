@@ -25,7 +25,8 @@ Artifacts appear in `build/musl/artifacts`:
 - `wbfreerdp-linux-x64.tar.gz`: executable, build manifest and notices.
 - `wbfreerdp-tests-linux-x64.tar.gz`: strict decoder test and a generated H.264 fixture.
 - `wbfreerdp-debug-linux-x64.tar.gz`: separate debugging symbols.
-- `wbfreerdp-sources.tar.gz`: FreeRDP sources and pinned upstream source archives.
+- `wbfreerdp-sources.tar.gz`: FreeRDP, dependency sources and matching Alpine recipes/patches.
+- `wbfreerdp-relink-linux-x64.tar.gz`: object files, static archives and a tested relinker.
 - `SHA256SUMS`: checksums for the archives.
 
 The build script also supports a native arm64 builder. Hardware and live-session
@@ -95,12 +96,12 @@ that tested path works; it is not a performance claim or coverage of other GPUs.
 `dependencies.json` pins upstream sources and checksums. `build.py` contains the
 small static-build adjustments for libva and PulseAudio. FreeRDP's source archive
 contains this recipe, including those adjustments. The manifest records the Alpine
-packages supplying the remaining static libraries; their build recipes and source
-references are available in Alpine's `3.23-stable` aports tree. Preserve the notices
+packages supplying the remaining static libraries. Their matching upstream sources,
+recipes and patches are included, pinned to the aports revision in `dependencies.json`. Preserve the notices
 and source materials when incorporating the executable in a distribution.
 
-These are development artifacts. The source archive includes the dependencies built
-from source by this recipe; it does not yet include all sources and notices for
-Alpine-provided static libraries or a verified relinking kit. Complete that
-distribution work before shipping this binary in a WinBoat release. CI uploads
-build artifacts but does not automatically publish releases.
+The runtime includes original notices and `SOURCES.md` with release source links.
+The [relinking kit](RELINK.md) contains the original link inputs and a relinker that
+is exercised by every build. Alpine recipe versions are checked against the linked
+packages; an upstream package update requires updating the pinned aports revision.
+CI uploads all artifacts; release publication is manual.

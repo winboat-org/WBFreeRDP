@@ -33,4 +33,4 @@ process checks driver initialization first. An invalid render device selected
 software fallback without aborting the client. This cannot contain failures in
 later driver calls; hardware support across other glibc drivers remains experimental.
 
-See [README.md](README.md) for supported features and remaining distribution work.
+See [README.md](README.md) for supported features and distribution materials.

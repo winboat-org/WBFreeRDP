@@ -17,6 +17,7 @@ under `winboat/` remain lab runners with additional documented dependencies.
 optional hardware decoding through the host's VA-API driver. Its validation and
 limitations are documented separately. The Portable WBFreeRDP workflow builds
 development artifacts on this branch and on `winboat-3.30.*` tags. Release publishing
-is manual. See the portable build documentation for remaining distribution work.
+is manual. Matching sources, original notices and a tested relinking kit accompany
+the portable executable.
 WinBoat application integration changes are saved separately under
 `winboat/patches/winboat/`.
