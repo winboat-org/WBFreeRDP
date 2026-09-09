@@ -201,6 +201,10 @@ struct xf_context
 	BOOL mouse_active;
 	BOOL fullscreen_toggle;
 	BOOL KeyboardState[256];
+	XIM unicodeIM;
+	XIC unicodeIC;
+	Window unicodeWindow;
+	BOOL unicodeKeyHandled[256];
 	XModifierKeymap* modifierMap;
 	wArrayList* keyCombinations;
 	wArrayList* xevents;

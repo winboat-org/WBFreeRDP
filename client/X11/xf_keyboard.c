@@ -797,6 +797,17 @@ static BOOL compareKey(const struct x11_key_scancode_t* a, size_t counta,
 }
 #endif
 
+static void xf_keyboard_unicode_close(xfContext* xfc)
+{
+	if (xfc->unicodeIC)
+		XDestroyIC(xfc->unicodeIC);
+	xfc->unicodeIC = nullptr;
+	if (xfc->unicodeIM)
+		XCloseIM(xfc->unicodeIM);
+	xfc->unicodeIM = nullptr;
+	xfc->unicodeWindow = None;
+}
+
 BOOL xf_keyboard_init(xfContext* xfc)
 {
 	rdpSettings* settings = nullptr;
@@ -828,6 +839,8 @@ BOOL xf_keyboard_init(xfContext* xfc)
 	settings = xfc->common.context.settings;
 	WINPR_ASSERT(settings);
 
+	xf_keyboard_unicode_close(xfc);
+	ZeroMemory(xfc->unicodeKeyHandled, sizeof(xfc->unicodeKeyHandled));
 	xf_keyboard_clear(xfc);
 
 	/* Layout detection algorithm:
@@ -861,6 +874,7 @@ BOOL xf_keyboard_init(xfContext* xfc)
 
 void xf_keyboard_free(xfContext* xfc)
 {
+	xf_keyboard_unicode_close(xfc);
 	xf_keyboard_modifier_map_free(xfc);
 	xf_keyboard_action_script_free(xfc);
 }
@@ -874,7 +888,7 @@ void xf_keyboard_key_press(xfContext* xfc, const XKeyEvent* event, KeySym keysym
 	WINPR_ASSERT(event->keycode < ARRAYSIZE(xfc->KeyboardState));
 
 	last = xfc->KeyboardState[event->keycode];
-	xfc->KeyboardState[event->keycode] = TRUE;
+	xfc->KeyboardState[event->keycode] = (event->keycode != 0);
 
 	if (xf_keyboard_handle_special_keys(xfc, keysym))
 		return;
@@ -983,7 +997,7 @@ static BOOL xf_keyboard_key_pressed(xfContext* xfc, KeySym keysym)
 {
 	KeyCode keycode = XKeysymToKeycode(xfc->display, keysym);
 	WINPR_ASSERT(keycode < ARRAYSIZE(xfc->KeyboardState));
-	return xfc->KeyboardState[keycode];
+	return (keycode != 0) && xfc->KeyboardState[keycode];
 }
 
 static int xk_keyboard_get_modifier_keys(xfContext* xfc, XF_MODIFIER_KEYS* mod);
@@ -998,27 +1012,104 @@ static BOOL xf_keyboard_has_system_modifier(xfContext* xfc)
 	return mod.Ctrl || mod.Alt || mod.Super;
 }
 
-static WCHAR* xf_keyboard_lookup_unicode(xfContext* xfc, const XKeyEvent* event, size_t* length)
+static void xf_keyboard_unicode_destroyed(XIM im, XPointer data, XPointer unused)
 {
+	WINPR_UNUSED(im);
+	WINPR_UNUSED(unused);
+	xfContext* xfc = (xfContext*)data;
+	/* The input method owns and has invalidated its contexts. */
+	xfc->unicodeIC = nullptr;
+	xfc->unicodeIM = nullptr;
+	xfc->unicodeWindow = None;
+}
+
+static BOOL xf_keyboard_unicode_open(xfContext* xfc, Window window)
+{
+	if (xfc->unicodeIC && (xfc->unicodeWindow == window))
+		return TRUE;
+	xf_keyboard_unicode_close(xfc);
+	xfc->unicodeIM = XOpenIM(xfc->display, nullptr, nullptr, nullptr);
+	if (!xfc->unicodeIM)
+	{
+		WLog_WARN(TAG, "Failed to XOpenIM");
+		return FALSE;
+	}
+	XIMCallback callback = { .client_data = (XPointer)xfc,
+		                     .callback = xf_keyboard_unicode_destroyed };
+	if (XSetIMValues(xfc->unicodeIM, XNDestroyCallback, &callback, nullptr))
+	{
+		xf_keyboard_unicode_close(xfc);
+		return FALSE;
+	}
+	xfc->unicodeIC = XCreateIC(xfc->unicodeIM, XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
+	                           XNClientWindow, xfc->drawable, XNFocusWindow, window, nullptr);
+	if (!xfc->unicodeIC)
+	{
+		WLog_WARN(TAG, "XCreateIC failed");
+		xf_keyboard_unicode_close(xfc);
+		return FALSE;
+	}
+	xfc->unicodeWindow = window;
+	XSetICFocus(xfc->unicodeIC);
+	return TRUE;
+}
+
+BOOL xf_keyboard_filter_unicode_event(xfContext* xfc, XEvent* event)
+{
+	if (!freerdp_settings_get_bool(xfc->common.context.settings, FreeRDP_UnicodeInput))
+		return FALSE;
+	if ((event->type == FocusOut) && (event->xfocus.window == xfc->unicodeWindow) &&
+	    (event->xfocus.mode != NotifyGrab) && (event->xfocus.mode != NotifyUngrab))
+	{
+		xf_keyboard_unicode_close(xfc);
+		return FALSE;
+	}
+	if (event->type == KeyPress)
+	{
+		if (event->xkey.keycode >= ARRAYSIZE(xfc->unicodeKeyHandled))
+			return FALSE;
+		xfc->unicodeKeyHandled[event->xkey.keycode] = FALSE;
+		if (xf_keyboard_has_system_modifier(xfc))
+		{
+			if (xfc->unicodeIC)
+				XFree(Xutf8ResetIC(xfc->unicodeIC));
+			return FALSE;
+		}
+		if (!xf_keyboard_unicode_open(xfc, event->xkey.window))
+			return FALSE;
+	}
+	const int type = event->type;
+	const unsigned int keycode =
+	    ((type == KeyPress) || (type == KeyRelease)) ? event->xkey.keycode : 0;
+	const BOOL filtered = xfc->unicodeIC ? XFilterEvent(event, None) : FALSE;
+	if (filtered)
+		XUngrabKeyboard(xfc->display, CurrentTime);
+	if ((type == KeyPress) && filtered)
+		xfc->unicodeKeyHandled[keycode] = TRUE;
+	if ((type == KeyRelease) && (keycode < ARRAYSIZE(xfc->unicodeKeyHandled)) &&
+	    xfc->unicodeKeyHandled[keycode])
+	{
+		xfc->unicodeKeyHandled[keycode] = FALSE;
+		xfc->KeyboardState[keycode] = FALSE;
+		return TRUE;
+	}
+	return filtered;
+}
+
+static WCHAR* xf_keyboard_lookup_unicode(xfContext* xfc, const XKeyEvent* event, size_t* length,
+                                         BOOL* handled)
+{
+	*handled = FALSE;
+	*length = 0;
 	char buffer[128] = WINPR_C_ARRAY_INIT;
 	char* text = buffer;
 	WCHAR* result = nullptr;
 	KeySym ignore = NoSymbol;
 	Status status = XLookupNone;
 	XKeyEvent ev = *event;
-	XIM xim = XOpenIM(xfc->display, nullptr, nullptr, nullptr);
-	if (!xim)
-	{
-		WLog_WARN(TAG, "Failed to XOpenIM");
-		return nullptr;
-	}
-	XIC xic = XCreateIC(xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, nullptr);
+	XIC xic = xfc->unicodeIC;
 	if (!xic)
-	{
-		WLog_WARN(TAG, "XCreateIC failed");
-		XCloseIM(xim);
 		return nullptr;
-	}
 
 	/* Xutf8LookupString returns a byte count, without requiring a terminating NUL. */
 	ev.type = KeyPress;
@@ -1031,14 +1122,15 @@ static WCHAR* xf_keyboard_lookup_unicode(xfContext* xfc, const XKeyEvent* event,
 		if (text)
 			count = Xutf8LookupString(xic, &ev, text, capacity, &ignore, &status);
 	}
+	/* A pending or failed text commit must not leak its physical key as a scan code. */
+	*handled = (status == XLookupNone) || (status == XLookupChars) || (status == XBufferOverflow) ||
+	           ((status == XLookupBoth) && (count > 0));
 	if (text && (count > 0) && (count <= capacity) &&
 	    ((status == XLookupChars) || (status == XLookupBoth)))
 		result = ConvertUtf8NToWCharAlloc(text, (size_t)count, length);
 
 	if (text != buffer)
 		free(text);
-	XDestroyIC(xic);
-	XCloseIM(xim);
 	return result;
 }
 
@@ -1065,15 +1157,16 @@ void xf_keyboard_send_key(xfContext* xfc, BOOL down, BOOL repeat, const XKeyEven
 	}
 	else
 	{
-		if (freerdp_settings_get_bool(xfc->common.context.settings, FreeRDP_UnicodeInput) &&
+		if (down && freerdp_settings_get_bool(xfc->common.context.settings, FreeRDP_UnicodeInput) &&
 		    !xf_keyboard_has_system_modifier(xfc))
 		{
 			size_t length = 0;
+			BOOL handled = FALSE;
 			WCHAR* text = nullptr;
 			if (rdp_scancode != RDP_SCANCODE_RETURN)
-				text = xf_keyboard_lookup_unicode(xfc, event, &length);
+				text = xf_keyboard_lookup_unicode(xfc, event, &length, &handled);
 
-			if (!text || (length == 0))
+			if (!handled)
 			{
 				if (rdp_scancode == RDP_SCANCODE_UNKNOWN)
 					WLog_ERR(TAG, "Unknown key with X keycode 0x%02" PRIx8 "", event->keycode);
@@ -1082,13 +1175,18 @@ void xf_keyboard_send_key(xfContext* xfc, BOOL down, BOOL repeat, const XKeyEven
 			}
 			else
 			{
-				/* Unicode RDP events carry UTF-16 code units, including both surrogates. */
-				for (size_t i = 0; i < length; i++)
+				/* XIM commits are text, including synthetic keycode-zero events with no
+				 * physical release. Send balanced UTF-16 events at commit time. */
+				for (size_t i = 0; text && (i < length); i++)
 				{
-					if (!freerdp_input_send_unicode_keyboard_event(
-					        input, down ? 0 : KBD_FLAGS_RELEASE, text[i]))
+					if (!freerdp_input_send_unicode_keyboard_event(input, 0, text[i]))
+						break;
+					if (!freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_RELEASE,
+					                                               text[i]))
 						break;
 				}
+				xfc->unicodeKeyHandled[event->keycode] = (event->keycode != 0);
+				xfc->KeyboardState[event->keycode] = FALSE;
 			}
 			free(text);
 		}

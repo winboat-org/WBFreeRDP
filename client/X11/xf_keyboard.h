@@ -27,6 +27,7 @@
 
 BOOL xf_keyboard_init(xfContext* xfc);
 void xf_keyboard_free(xfContext* xfc);
+BOOL xf_keyboard_filter_unicode_event(xfContext* xfc, XEvent* event);
 
 BOOL xf_keyboard_action_script_init(xfContext* xfc);
 

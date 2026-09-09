@@ -614,7 +614,9 @@ static BOOL xf_event_KeyPress(xfContext* xfc, const XKeyEvent* event, BOOL app)
 	} cnv;
 	cnv.cev = event;
 	WINPR_UNUSED(app);
-	XLookupString(cnv.ev, str, sizeof(str), &keysym, nullptr);
+	/* XIM synthetic commits use keycode zero; obtain their text from the input context. */
+	if (event->keycode != 0)
+		XLookupString(cnv.ev, str, sizeof(str), &keysym, nullptr);
 	xf_keyboard_key_press(xfc, event, keysym);
 	return TRUE;
 }
@@ -1284,6 +1286,11 @@ BOOL xf_event_process(freerdp* instance, const XEvent* event)
 			}
 		}
 	}
+
+	XEvent inputEvent = *event;
+	if (xf_keyboard_filter_unicode_event(xfc, &inputEvent))
+		return TRUE;
+	event = &inputEvent;
 
 	xf_event_execute_action_script(xfc, event);
 
