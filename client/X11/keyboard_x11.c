@@ -23,14 +23,31 @@
 #include <X11/X.h>
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
+#include <X11/XKBlib.h>
 
 #include "xf_debug.h"
 #include "keyboard_x11.h"
 #include "xkb_layout_ids.h"
 #include "xf_utils.h"
 
-static BOOL parse_xkb_rule_names(char* xkb_rule, unsigned long num_bytes, char** layout,
-                                 char** variant)
+static char* xkb_rule_group(char* list, unsigned int group)
+{
+	for (unsigned int i = 0; i < group; i++)
+	{
+		char* delimiter = strchr(list, ',');
+		if (!delimiter)
+			return nullptr;
+		list = delimiter + 1;
+	}
+
+	char* delimiter = strchr(list, ',');
+	if (delimiter)
+		*delimiter = '\0';
+	return list;
+}
+
+static BOOL parse_xkb_rule_names(char* xkb_rule, unsigned long num_bytes, unsigned int group,
+                                 char** layout, char** variant)
 {
 	/* Sample output for "Canadian Multilingual Standard"
 	 *
@@ -47,46 +64,37 @@ static BOOL parse_xkb_rule_names(char* xkb_rule, unsigned long num_bytes, char**
 	 * “eurosign:e,lv3:ralt_switch,grp:rctrl_toggle”
 	 *         - three options)
 	 */
-	for (size_t i = 0, index = 0; i < num_bytes; i++, index++)
+	*layout = nullptr;
+	*variant = nullptr;
+	for (size_t i = 0, index = 0; i < num_bytes; index++)
 	{
 		char* ptr = xkb_rule + i;
-		i += strnlen(ptr, num_bytes - i);
-
-		switch (index)
+		const size_t length = strnlen(ptr, num_bytes - i);
+		if (length == num_bytes - i)
+			return FALSE;
+		i += length + 1;
+		if (index == 2)
+			*layout = ptr;
+		else if (index == 3)
 		{
-			case 0: // rules
-				break;
-			case 1: // model
-				break;
-			case 2: // layout
-			{
-				/* If multiple languages are present we just take the first one */
-				char* delimiter = strchr(ptr, ',');
-				if (delimiter)
-					*delimiter = '\0';
-				*layout = ptr;
-				break;
-			}
-			case 3: // variant
-			{
-				/* If multiple variants are present we just take the first one */
-				char* delimiter = strchr(ptr, ',');
-				if (delimiter)
-					*delimiter = '\0';
-				*variant = ptr;
-			}
+			*variant = ptr;
 			break;
-			case 4: // option
-				break;
-			default:
-				break;
 		}
 	}
-	return TRUE;
+	if (!*layout || !*variant)
+		return FALSE;
+
+	*layout = xkb_rule_group(*layout, group);
+	/* An omitted variant means the default for that group, not group zero's variant. */
+	char* empty_variant = *variant + strlen(*variant);
+	*variant = xkb_rule_group(*variant, group);
+	if (!*variant)
+		*variant = empty_variant;
+	return *layout && (**layout != '\0');
 }
 
 static DWORD kbd_layout_id_from_x_property(wLog* log, Display* display, Window root,
-                                           char* property_name)
+                                           char* property_name, unsigned int group)
 {
 	char* layout = nullptr;
 	char* variant = nullptr;
@@ -112,7 +120,11 @@ static DWORD kbd_layout_id_from_x_property(wLog* log, Display* display, Window r
 		return 0;
 	}
 
-	parse_xkb_rule_names(rule, items, &layout, &variant);
+	if (!parse_xkb_rule_names(rule, items, group, &layout, &variant))
+	{
+		XFree(rule);
+		return 0;
+	}
 
 	WLog_Print(log, WLOG_TRACE, "%s layout: %s, variant: %s", property_name, layout, variant);
 	layout_id = xf_find_keyboard_layout_in_xorg_rules(log, layout, variant);
@@ -131,13 +143,20 @@ int xf_detect_keyboard_layout_from_xkb(wLog* log, DWORD* keyboardLayoutId)
 
 	Window root = DefaultRootWindow(display);
 	if (!root)
+	{
+		LogDynAndXCloseDisplay(log, display);
 		return 0;
+	}
+
+	XkbStateRec state = { 0 };
+	const unsigned int group =
+	    (XkbGetState(display, XkbUseCoreKbd, &state) == Success) ? state.group : 0;
 
 	/* We start by looking for _XKB_RULES_NAMES_BACKUP which appears to be used by libxklavier */
-	DWORD id = kbd_layout_id_from_x_property(log, display, root, "_XKB_RULES_NAMES_BACKUP");
+	DWORD id = kbd_layout_id_from_x_property(log, display, root, "_XKB_RULES_NAMES_BACKUP", group);
 
 	if (0 == id)
-		id = kbd_layout_id_from_x_property(log, display, root, "_XKB_RULES_NAMES");
+		id = kbd_layout_id_from_x_property(log, display, root, "_XKB_RULES_NAMES", group);
 
 	if (0 != id)
 		*keyboardLayoutId = id;
