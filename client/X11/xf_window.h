@@ -102,6 +102,8 @@ int xf_AppWindowInit(xfContext* xfc, xfAppWindow* appWindow);
 BOOL xf_AppWindowResize(xfContext* xfc, xfAppWindow* appWindow);
 
 void xf_SetWindowText(xfContext* xfc, xfAppWindow* appWindow, const char* name);
+void xf_SyncResizeFrame(xfContext* xfc, xfAppWindow* appWindow);
+
 void xf_MoveWindow(xfContext* xfc, xfAppWindow* appWindow, int x, int y, int width, int height);
 void xf_ShowWindow(xfContext* xfc, xfAppWindow* appWindow, BYTE state);
 // void xf_SetWindowIcon(xfContext* xfc, xfAppWindow* appWindow, rdpIcon* icon);

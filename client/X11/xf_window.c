@@ -1206,6 +1206,49 @@ void xf_EndLocalMoveSize(xfContext* xfc, xfAppWindow* appWindow)
 	appWindow->local_move.state = LMS_NOT_ACTIVE;
 }
 
+static void xf_CopyAppArea(xfContext* xfc, xfAppWindow* appWindow, int x, int y, unsigned width,
+                           unsigned height)
+{
+	LogDynAndXCopyArea(xfc->log, xfc->display, appWindow->pixmap, appWindow->handle, appWindow->gc,
+	                   x, y, width, height, x + appWindow->frameLeft, y + appWindow->frameTop);
+}
+
+void xf_SyncResizeFrame(xfContext* xfc, xfAppWindow* appWindow)
+{
+	if (xfc->depth != 32)
+		return;
+	int left = 0, top = 0, right = 0, bottom = 0;
+	if ((appWindow->dwStyle & WS_SIZEBOX) && appWindow->showState != WINDOW_SHOW_MAXIMIZED &&
+	    !appWindow->is_transient && appWindow->resizeMarginLeft < 64 &&
+	    appWindow->resizeMarginTop < 64 && appWindow->resizeMarginRight < 64 &&
+	    appWindow->resizeMarginBottom < 64)
+	{
+		left = (int)appWindow->resizeMarginLeft;
+		top = (int)appWindow->resizeMarginTop;
+		right = (int)appWindow->resizeMarginRight;
+		bottom = (int)appWindow->resizeMarginBottom;
+	}
+	if (left == appWindow->frameLeft && top == appWindow->frameTop &&
+	    right == appWindow->frameRight && bottom == appWindow->frameBottom)
+		return;
+	appWindow->frameLeft = left;
+	appWindow->frameTop = top;
+	appWindow->frameRight = right;
+	appWindow->frameBottom = bottom;
+	const unsigned long extents[4] = { (unsigned long)left, (unsigned long)right,
+		                               (unsigned long)top, (unsigned long)bottom };
+	const Atom atom = XInternAtom(xfc->display, "_GTK_FRAME_EXTENTS", False);
+	XChangeProperty(xfc->display, appWindow->handle, atom, XA_CARDINAL, 32, PropModeReplace,
+	                (const unsigned char*)extents, 4);
+	XMoveResizeWindow(xfc->display, appWindow->handle, appWindow->x - left, appWindow->y - top,
+	                  (unsigned)(appWindow->width + left + right),
+	                  (unsigned)(appWindow->height + top + bottom));
+	XClearWindow(xfc->display, appWindow->handle);
+	/* A frame-only update may not receive a new surface or an expose event. */
+	xf_CopyAppArea(xfc, appWindow, 0, 0, (unsigned)appWindow->width, (unsigned)appWindow->height);
+}
+
+
 void xf_MoveWindow(xfContext* xfc, xfAppWindow* appWindow, int x, int y, int width, int height)
 {
 	BOOL resize = FALSE;
@@ -1229,12 +1272,15 @@ void xf_MoveWindow(xfContext* xfc, xfAppWindow* appWindow, int x, int y, int wid
 		if (!xf_AppWindowResize(xfc, appWindow))
 			return;
 
-		LogDynAndXMoveResizeWindow(xfc->log, xfc->display, appWindow->handle, x, y,
-		                           WINPR_ASSERTING_INT_CAST(uint32_t, width),
-		                           WINPR_ASSERTING_INT_CAST(uint32_t, height));
+		LogDynAndXMoveResizeWindow(
+		    xfc->log, xfc->display, appWindow->handle, x - appWindow->frameLeft,
+		    y - appWindow->frameTop,
+		    (unsigned)(width + appWindow->frameLeft + appWindow->frameRight),
+		    (unsigned)(height + appWindow->frameTop + appWindow->frameBottom));
 	}
 	else
-		LogDynAndXMoveWindow(xfc->log, xfc->display, appWindow->handle, x, y);
+		LogDynAndXMoveWindow(xfc->log, xfc->display, appWindow->handle, x - appWindow->frameLeft,
+		                     y - appWindow->frameTop);
 
 	xf_UpdateWindowArea(xfc, appWindow, 0, 0, width, height);
 }
@@ -1354,10 +1400,23 @@ void xf_SetWindowVisibilityRects(xfContext* xfc, xfAppWindow* appWindow, UINT32 
 		xrects[i].height = WINPR_CXX_COMPAT_CAST(unsigned short, rects[i].bottom - rects[i].top);
 	}
 
-	XShapeCombineRectangles(
-	    xfc->display, appWindow->handle, ShapeBounding, WINPR_ASSERTING_INT_CAST(int, rectsOffsetX),
-	    WINPR_ASSERTING_INT_CAST(int, rectsOffsetY), xrects, nrects, ShapeSet, 0);
+	XShapeCombineRectangles(xfc->display, appWindow->handle, ShapeBounding,
+	                        (INT32)rectsOffsetX + appWindow->frameLeft,
+	                        (INT32)rectsOffsetY + appWindow->frameTop, xrects, nrects, ShapeSet, 0);
 	free(xrects);
+	/* Preserve the server's content shape and add only the transparent resize ring. */
+	const int left = appWindow->frameLeft, right = appWindow->frameRight;
+	const int top = appWindow->frameTop, bottom = appWindow->frameBottom;
+	const unsigned short w = (unsigned short)(appWindow->width + left + right);
+	const unsigned short h = (unsigned short)(appWindow->height + top + bottom);
+	const XRectangle ring[4] = { { 0, 0, (unsigned short)left, h },
+		                         { (short)(left + appWindow->width), 0, (unsigned short)right, h },
+		                         { 0, 0, w, (unsigned short)top },
+		                         { 0, (short)(top + appWindow->height), w,
+		                           (unsigned short)bottom } };
+	if (left || right || top || bottom)
+		XShapeCombineRectangles(xfc->display, appWindow->handle, ShapeBounding, 0, 0,
+		                        (XRectangle*)ring, 4, ShapeUnion, Unsorted);
 #endif
 }
 
@@ -1386,8 +1445,25 @@ void xf_UpdateWindowArea(xfContext* xfc, xfAppWindow* appWindow, int x, int y, i
 	if (appWindow == nullptr)
 		return;
 
-	if (appWindow->surfaceId < UINT16_MAX)
+	if (x < 0)
+	{
+		width += x;
+		x = 0;
+	}
+	if (y < 0)
+	{
+		height += y;
+		y = 0;
+	}
+	width = MIN(width, appWindow->width - x);
+	height = MIN(height, appWindow->height - y);
+	if (width <= 0 || height <= 0)
 		return;
+	if (appWindow->surfaceId < UINT16_MAX)
+	{
+		xf_CopyAppArea(xfc, appWindow, x, y, (unsigned)width, (unsigned)height);
+		return;
+	}
 
 	ax = x + appWindow->windowOffsetX;
 	ay = y + appWindow->windowOffsetY;
@@ -1405,9 +1481,7 @@ void xf_UpdateWindowArea(xfContext* xfc, xfAppWindow* appWindow, int x, int y, i
 		                   WINPR_ASSERTING_INT_CAST(uint32_t, height));
 	}
 
-	LogDynAndXCopyArea(xfc->log, xfc->display, appWindow->pixmap, appWindow->handle, appWindow->gc,
-	                   x, y, WINPR_ASSERTING_INT_CAST(uint32_t, width),
-	                   WINPR_ASSERTING_INT_CAST(uint32_t, height), x, y);
+	xf_CopyAppArea(xfc, appWindow, x, y, (unsigned)width, (unsigned)height);
 	LogDynAndXFlush(xfc->log, xfc->display);
 }
 
@@ -1539,19 +1613,23 @@ UINT xf_AppUpdateWindowFromSurface(xfContext* xfc, gdiGfxSurface* surface)
 	if (surfaceChanged)
 		appWindow->surfaceId = surface->surfaceId;
 
-	const BOOL maximized = (appWindow->dwStyle & WS_MAXIMIZE) != 0;
+	const BOOL maximized = (appWindow->dwStyle & WS_MAXIMIZE) ||
+	                       (appWindow->maxVert && appWindow->maxHorz) ||
+	                       (appWindow->rail_state == WINDOW_SHOW_MAXIMIZED);
 	const UINT32 winW = WINPR_ASSERTING_INT_CAST(uint32_t, appWindow->width);
 	const UINT32 winH = WINPR_ASSERTING_INT_CAST(uint32_t, appWindow->height);
+	const UINT32 surfaceWidth = surface->mappedWidth ? surface->mappedWidth : surface->width;
+	const UINT32 surfaceHeight = surface->mappedHeight ? surface->mappedHeight : surface->height;
 
 	const BOOL swGdi = freerdp_settings_get_bool(xfc->common.context.settings, FreeRDP_SoftwareGdi);
 	UINT32 nrects = 0;
 	const RECTANGLE_16* rects = region16_rects(&surface->invalidRegion, &nrects);
 
 	RECTANGLE_16 fullRect = WINPR_C_ARRAY_INIT;
-	if (surfaceChanged)
+	if (surfaceChanged || (swGdi && !appWindow->image))
 	{
-		fullRect.right = WINPR_ASSERTING_INT_CAST(UINT16, MIN(winW, surface->width));
-		fullRect.bottom = WINPR_ASSERTING_INT_CAST(UINT16, MIN(winH, surface->height));
+		fullRect.right = WINPR_ASSERTING_INT_CAST(UINT16, surfaceWidth);
+		fullRect.bottom = WINPR_ASSERTING_INT_CAST(UINT16, surfaceHeight);
 		if ((fullRect.right > 0) && (fullRect.bottom > 0))
 		{
 			rects = &fullRect;
@@ -1561,8 +1639,8 @@ UINT xf_AppUpdateWindowFromSurface(xfContext* xfc, gdiGfxSurface* surface)
 
 	if (swGdi)
 	{
-		if (surfaceChanged || (appWindow->width != (INT64)surface->width) ||
-		    (appWindow->height != (INT64)surface->height))
+		/* Surface storage is immutable until unmapping, which also destroys this wrapper. */
+		if (surfaceChanged)
 			xf_AppWindowDestroyImage(appWindow);
 
 		if (!appWindow->image)
@@ -1622,6 +1700,10 @@ UINT xf_AppUpdateWindowFromSurface(xfContext* xfc, gdiGfxSurface* surface)
 			h += dstY;
 			dstY = 0;
 		}
+		w = MIN(w, (int)winW - dstX);
+		h = MIN(h, (int)winH - dstY);
+		w = MIN(w, (int)surfaceWidth - srcX);
+		h = MIN(h, (int)surfaceHeight - srcY);
 		if ((w <= 0) || (h <= 0))
 			continue;
 
@@ -1629,9 +1711,7 @@ UINT xf_AppUpdateWindowFromSurface(xfContext* xfc, gdiGfxSurface* surface)
 		                   srcY, dstX, dstY, WINPR_ASSERTING_INT_CAST(uint32_t, w),
 		                   WINPR_ASSERTING_INT_CAST(uint32_t, h));
 
-		LogDynAndXCopyArea(xfc->log, xfc->display, appWindow->pixmap, appWindow->handle,
-		                   appWindow->gc, dstX, dstY, WINPR_ASSERTING_INT_CAST(uint32_t, w),
-		                   WINPR_ASSERTING_INT_CAST(uint32_t, h), dstX, dstY);
+		xf_CopyAppArea(xfc, appWindow, dstX, dstY, (unsigned)w, (unsigned)h);
 	}
 
 	rc = CHANNEL_RC_OK;
@@ -1646,18 +1726,45 @@ BOOL xf_AppWindowResize(xfContext* xfc, xfAppWindow* appWindow)
 {
 	WINPR_ASSERT(xfc);
 	WINPR_ASSERT(appWindow);
-
-	if (appWindow->pixmap != 0)
-		LogDynAndXFreePixmap(xfc->log, xfc->display, appWindow->pixmap);
-
 	WINPR_ASSERT(xfc->depth != 0);
-	appWindow->pixmap = LogDynAndXCreatePixmap(
-	    xfc->log, xfc->display, xfc->drawable, WINPR_ASSERTING_INT_CAST(uint32_t, appWindow->width),
-	    WINPR_ASSERTING_INT_CAST(uint32_t, appWindow->height),
-	    WINPR_ASSERTING_INT_CAST(uint32_t, xfc->depth));
-	xf_AppWindowDestroyImage(appWindow);
-
-	return appWindow->pixmap != 0;
+	if (!appWindow->pixmap || appWindow->width > appWindow->pixmapWidth ||
+	    appWindow->height > appWindow->pixmapHeight)
+	{
+		const int width = MAX(appWindow->pixmapWidth, (appWindow->width + 255) & ~255);
+		const int height = MAX(appWindow->pixmapHeight, (appWindow->height + 255) & ~255);
+		Pixmap next = XCreatePixmap(xfc->display, xfc->drawable, (unsigned)width, (unsigned)height,
+		                            (unsigned)xfc->depth);
+		if (!next)
+			return FALSE;
+		XGCValues values = WINPR_C_ARRAY_INIT;
+		XGetGCValues(xfc->display, appWindow->gc, GCForeground, &values);
+		XSetForeground(xfc->display, appWindow->gc, xfc->depth == 32 ? 0xff000000UL : 0);
+		XFillRectangle(xfc->display, next, appWindow->gc, 0, 0, (unsigned)width, (unsigned)height);
+		XSetForeground(xfc->display, appWindow->gc, values.foreground);
+		if (appWindow->pixmap)
+		{
+			XCopyArea(xfc->display, appWindow->pixmap, next, appWindow->gc, 0, 0,
+			          (unsigned)appWindow->pixmapWidth, (unsigned)appWindow->pixmapHeight, 0, 0);
+			XFreePixmap(xfc->display, appWindow->pixmap);
+		}
+		appWindow->pixmap = next;
+		appWindow->pixmapWidth = width;
+		appWindow->pixmapHeight = height;
+	}
+	const int left = appWindow->frameLeft, right = appWindow->frameRight;
+	const int top = appWindow->frameTop, bottom = appWindow->frameBottom;
+	if (left)
+		XClearArea(xfc->display, appWindow->handle, 0, 0, (unsigned)left, 0, False);
+	if (right)
+		XClearArea(xfc->display, appWindow->handle, left + appWindow->width, 0, (unsigned)right, 0,
+		           False);
+	if (top)
+		XClearArea(xfc->display, appWindow->handle, 0, 0, 0, (unsigned)top, False);
+	if (bottom)
+		XClearArea(xfc->display, appWindow->handle, 0, top + appWindow->height, 0, (unsigned)bottom,
+		           False);
+	xf_CopyAppArea(xfc, appWindow, 0, 0, (unsigned)appWindow->width, (unsigned)appWindow->height);
+	return TRUE;
 }
 
 void xf_XSetTransientForHint(xfContext* xfc, xfAppWindow* window)

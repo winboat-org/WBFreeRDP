@@ -27,6 +27,7 @@
 #include <winpr/assert.h>
 #include <winpr/wlog.h>
 #include <winpr/print.h>
+#include <winpr/sysinfo.h>
 
 #include <freerdp/client/rail.h>
 
@@ -36,6 +37,8 @@
 
 #include <freerdp/log.h>
 #define TAG CLIENT_TAG("x11")
+
+#define XF_RAIL_POSITION_TIMEOUT_MS 1000
 
 static const char* error_code2str(UINT32 code)
 {
@@ -206,13 +209,26 @@ BOOL xf_rail_send_client_system_command(xfContext* xfc, UINT64 windowId, UINT16 
 	return rc == CHANNEL_RC_OK;
 }
 
+static BOOL xf_rail_geometry_matches_server(const xfAppWindow* window)
+{
+	return window->x == window->windowOffsetX && window->y == window->windowOffsetY &&
+	       window->width == (INT64)window->windowWidth &&
+	       window->height == (INT64)window->windowHeight;
+}
+
+static BOOL xf_rail_is_maximized(const xfAppWindow* window)
+{
+	return window->showState == WINDOW_SHOW_MAXIMIZED ||
+	       window->rail_state == WINDOW_SHOW_MAXIMIZED || (window->maxVert && window->maxHorz);
+}
+
 /**
  * The position of the X window can become out of sync with the RDP window
  * if the X window is moved locally by the window manager.  In this event
  * send an update to the RDP server informing it of the new window position
  * and size.
  */
-BOOL xf_rail_adjust_position(xfContext* xfc, xfAppWindow* appWindow)
+static BOOL xf_rail_adjust_position(xfContext* xfc, xfAppWindow* appWindow)
 {
 	RAIL_WINDOW_MOVE_ORDER windowMove = WINPR_C_ARRAY_INIT;
 
@@ -221,10 +237,20 @@ BOOL xf_rail_adjust_position(xfContext* xfc, xfAppWindow* appWindow)
 	if (!appWindow->is_mapped || appWindow->local_move.state != LMS_NOT_ACTIVE)
 		return FALSE;
 
+	if (appWindow->geometryPending || appWindow->geometryInFlight)
+		return TRUE;
+
+	/*
+	 * Maximize/restore is owned by the system command. The WM can deliver its
+	 * restored ConfigureNotify before the server acknowledges SC_RESTORE.
+	 * Until that acknowledgement, resize margins and server geometry still
+	 * describe the maximized window and must not be used for a WindowMove.
+	 */
+	if (xf_rail_is_maximized(appWindow))
+		return TRUE;
+
 	/* If current window position disagrees with RDP window position, send update to RDP server */
-	if (appWindow->x != appWindow->windowOffsetX || appWindow->y != appWindow->windowOffsetY ||
-	    appWindow->width != (INT64)appWindow->windowWidth ||
-	    appWindow->height != (INT64)appWindow->windowHeight)
+	if (!xf_rail_geometry_matches_server(appWindow))
 	{
 		WINPR_ASSERT(appWindow->windowId <= UINT32_MAX);
 		windowMove.windowId = (UINT32)appWindow->windowId;
@@ -241,10 +267,86 @@ BOOL xf_rail_adjust_position(xfContext* xfc, xfAppWindow* appWindow)
 		windowMove.right = WINPR_ASSERTING_INT_CAST(INT16, appWindow->x + appWindow->width + right);
 		windowMove.bottom =
 		    WINPR_ASSERTING_INT_CAST(INT16, appWindow->y + appWindow->height + bottom);
+		appWindow->geometryInFlight = TRUE;
+		appWindow->geometrySentAt = GetTickCount64();
+		appWindow->requestedX = appWindow->x;
+		appWindow->requestedY = appWindow->y;
+		appWindow->requestedWidth = appWindow->width;
+		appWindow->requestedHeight = appWindow->height;
 		const UINT rc = xfc->rail->ClientWindowMove(xfc->rail, &windowMove);
+		if (rc != CHANNEL_RC_OK)
+			appWindow->geometryInFlight = FALSE;
 		return rc == CHANNEL_RC_OK;
 	}
 	return TRUE;
+}
+
+void xf_rail_queue_position(xfAppWindow* window)
+{
+	if (!window->is_mapped || window->local_move.state != LMS_NOT_ACTIVE ||
+	    xf_rail_is_maximized(window))
+		return;
+	/* Returning to the current server bounds must still supersede an outstanding request. */
+	if (!window->geometryInFlight && xf_rail_geometry_matches_server(window))
+		return;
+	window->geometryPending = TRUE;
+}
+
+BOOL xf_rail_has_pending_positions(xfContext* xfc)
+{
+	if (!xfc->remote_app || !xfc->railWindows)
+		return FALSE;
+	BOOL pending = FALSE;
+	xf_AppWindowsLock(xfc);
+	ULONG_PTR* keys = nullptr;
+	const size_t count = HashTable_GetKeys(xfc->railWindows, &keys);
+	for (size_t i = 0; i < count && !pending; i++)
+	{
+		xfAppWindow* window = xf_rail_get_window(xfc, *(UINT64*)keys[i], TRUE);
+		if (!window)
+			continue;
+		pending = window->geometryPending || window->geometryInFlight;
+		xf_rail_return_window(window, TRUE);
+	}
+	free(keys);
+	xf_AppWindowsUnlock(xfc);
+	return pending;
+}
+
+void xf_rail_check_pending_positions(xfContext* xfc)
+{
+	if (!xfc->remote_app || !xfc->railWindows)
+		return;
+	xf_AppWindowsLock(xfc);
+	ULONG_PTR* keys = nullptr;
+	const size_t count = HashTable_GetKeys(xfc->railWindows, &keys);
+	const UINT64 now = GetTickCount64();
+	for (size_t i = 0; i < count; i++)
+	{
+		xfAppWindow* window = xf_rail_get_window(xfc, *(UINT64*)keys[i], TRUE);
+		if (!window)
+			continue;
+		if (window->geometryInFlight && now - window->geometrySentAt > XF_RAIL_POSITION_TIMEOUT_MS)
+		{
+			window->geometryInFlight = FALSE;
+			if (!window->geometryPending && window->local_move.state == LMS_NOT_ACTIVE &&
+			    !xf_rail_is_maximized(window) && window->showState != WINDOW_SHOW_MINIMIZED)
+				xf_MoveWindow(xfc, window, window->windowOffsetX, window->windowOffsetY,
+				              (int)window->windowWidth, (int)window->windowHeight);
+		}
+		/* Keep one server geometry request outstanding and send the newest local bounds. */
+		if (window->geometryPending && !window->geometryInFlight &&
+		    window->local_move.state == LMS_NOT_ACTIVE &&
+		    now - window->geometrySentAt >= XF_RAIL_POSITION_INTERVAL_MS)
+		{
+			window->geometryPending = FALSE;
+			xf_rail_adjust_position(xfc, window);
+		}
+
+		xf_rail_return_window(window, TRUE);
+	}
+	free(keys);
+	xf_AppWindowsUnlock(xfc);
 }
 
 BOOL xf_rail_end_local_move(xfContext* xfc, xfAppWindow* appWindow)
@@ -260,13 +362,13 @@ BOOL xf_rail_end_local_move(xfContext* xfc, xfAppWindow* appWindow)
 	WINPR_ASSERT(xfc);
 	WINPR_ASSERT(appWindow);
 
-	if ((appWindow->local_move.direction == NET_WM_MOVERESIZE_MOVE_KEYBOARD) ||
-	    (appWindow->local_move.direction == NET_WM_MOVERESIZE_SIZE_KEYBOARD))
+	/* MS-RDPERP 1.3.2.5 requires the final rectangle for all resizing. */
+	if (appWindow->local_move.direction != NET_WM_MOVERESIZE_MOVE)
 	{
 		RAIL_WINDOW_MOVE_ORDER windowMove = WINPR_C_ARRAY_INIT;
 
 		/*
-		 * For keyboard moves send and explicit update to RDP server
+		 * For resizing and keyboard moves, send an explicit update to the RDP server
 		 */
 		WINPR_ASSERT(appWindow->windowId <= UINT32_MAX);
 		windowMove.windowId = (UINT32)appWindow->windowId;
@@ -432,6 +534,8 @@ static BOOL xf_rail_window_common(rdpContext* context, const WINDOW_ORDER_INFO* 
 
 		appWindow->dwStyle = windowState->style;
 		appWindow->dwExStyle = windowState->extendedStyle;
+		if (fieldFlags & WINDOW_ORDER_FIELD_SHOW)
+			appWindow->showState = windowState->showState;
 		window_state_log_style(xfc->log, windowState);
 
 		/* Ensure window always gets a window title */
@@ -455,6 +559,18 @@ static BOOL xf_rail_window_common(rdpContext* context, const WINDOW_ORDER_INFO* 
 		if (!appWindow->title)
 			goto fail;
 
+		/* Size the invisible frame before mapping, while no WM configure feedback can race it. */
+		if (fieldFlags & WINDOW_ORDER_FIELD_RESIZE_MARGIN_X)
+		{
+			appWindow->resizeMarginLeft = windowState->resizeMarginLeft;
+			appWindow->resizeMarginRight = windowState->resizeMarginRight;
+		}
+		if (fieldFlags & WINDOW_ORDER_FIELD_RESIZE_MARGIN_Y)
+		{
+			appWindow->resizeMarginTop = windowState->resizeMarginTop;
+			appWindow->resizeMarginBottom = windowState->resizeMarginBottom;
+		}
+		xf_SyncResizeFrame(xfc, appWindow);
 		xf_AppWindowInit(xfc, appWindow);
 	}
 
@@ -599,16 +715,18 @@ static BOOL xf_rail_window_common(rdpContext* context, const WINDOW_ORDER_INFO* 
 		}
 	}
 
+	if (appWindow->geometryInFlight && appWindow->windowOffsetX == appWindow->requestedX &&
+	    appWindow->windowOffsetY == appWindow->requestedY &&
+	    appWindow->windowWidth == (UINT32)appWindow->requestedWidth &&
+	    appWindow->windowHeight == (UINT32)appWindow->requestedHeight)
+		appWindow->geometryInFlight = FALSE;
+	if ((fieldFlags & WINDOW_ORDER_FIELD_SHOW) && appWindow->showState != WINDOW_SHOW)
+	{
+		appWindow->geometryPending = FALSE;
+		appWindow->geometryInFlight = FALSE;
+	}
+
 	/* Update Window */
-
-	if (fieldFlags & WINDOW_ORDER_FIELD_STYLE)
-	{
-	}
-
-	if (fieldFlags & WINDOW_ORDER_FIELD_SHOW)
-	{
-		xf_ShowWindow(xfc, appWindow, WINPR_ASSERTING_INT_CAST(UINT8, appWindow->showState));
-	}
 
 	if (fieldFlags & WINDOW_ORDER_FIELD_TITLE)
 	{
@@ -616,6 +734,7 @@ static BOOL xf_rail_window_common(rdpContext* context, const WINDOW_ORDER_INFO* 
 			xf_SetWindowText(xfc, appWindow, appWindow->title);
 	}
 
+	xf_SyncResizeFrame(xfc, appWindow);
 	if (position_or_size_updated)
 	{
 		const INT32 visibilityRectsOffsetX =
@@ -630,14 +749,12 @@ static BOOL xf_rail_window_common(rdpContext* context, const WINDOW_ORDER_INFO* 
 		 * it is hidden in some cases this can cause the window not to restore back to its original
 		 * size. Therefore we don't update our local window when that rail window state is minimized
 		 */
-		if (appWindow->rail_state != WINDOW_SHOW_MINIMIZED)
+		if (appWindow->showState != WINDOW_SHOW_MINIMIZED)
 		{
-			const BOOL maximized = (appWindow->dwStyle & WS_MAXIMIZE) != 0;
+			const BOOL maximized = appWindow->showState == WINDOW_SHOW_MAXIMIZED;
 			/* Leave maximized windows to the WM, which honors the work area. */
-			if (maximized || (appWindow->x == (INT64)appWindow->windowOffsetX &&
-			                  appWindow->y == (INT64)appWindow->windowOffsetY &&
-			                  appWindow->width == (INT64)appWindow->windowWidth &&
-			                  appWindow->height == (INT64)appWindow->windowHeight))
+			if (maximized || appWindow->geometryPending || appWindow->geometryInFlight ||
+			    xf_rail_geometry_matches_server(appWindow))
 			{
 				xf_UpdateWindowArea(xfc, appWindow, 0, 0,
 				                    WINPR_ASSERTING_INT_CAST(int, appWindow->windowWidth),
@@ -651,7 +768,7 @@ static BOOL xf_rail_window_common(rdpContext* context, const WINDOW_ORDER_INFO* 
 			}
 
 			/* Show a maximized window fully; its frame-inset visibility rects would clip it. */
-			if (maximized)
+			if (maximized || appWindow->geometryPending || appWindow->geometryInFlight)
 				xf_ClearWindowVisibilityRects(xfc, appWindow);
 			else
 				xf_SetWindowVisibilityRects(
@@ -677,6 +794,12 @@ static BOOL xf_rail_window_common(rdpContext* context, const WINDOW_ORDER_INFO* 
 	{
 	    xf_SetWindowRects(xfc, appWindow, appWindow->windowRects, appWindow->numWindowRects);
 	}*/
+	/* Submit WM state after frame/geometry updates so they cannot override maximization. */
+	if (fieldFlags & WINDOW_ORDER_FIELD_SHOW)
+	{
+		xf_ShowWindow(xfc, appWindow, WINPR_ASSERTING_INT_CAST(UINT8, appWindow->showState));
+	}
+
 	rc = TRUE;
 fail:
 	xf_rail_return_window(appWindow, FALSE);

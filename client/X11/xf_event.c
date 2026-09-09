@@ -692,7 +692,7 @@ static BOOL xf_event_FocusIn(xfContext* xfc, const XFocusInEvent* event, BOOL ap
 		/* Update the server with any window changes that occurred while the window was not focused.
 		 */
 		if (appWindow)
-			xf_rail_adjust_position(xfc, appWindow);
+			xf_rail_queue_position(appWindow);
 		xf_rail_return_window(appWindow, FALSE);
 	}
 
@@ -884,16 +884,49 @@ static BOOL xf_event_ConfigureNotify(xfContext* xfc, const XConfigureEvent* even
 
 		if (appWindow)
 		{
+			XWindowAttributes attrs = WINPR_C_ARRAY_INIT;
+			if (!XGetWindowAttributes(xfc->display, appWindow->handle, &attrs))
+			{
+				xf_rail_return_window(appWindow, FALSE);
+				return TRUE;
+			}
+			const int width = attrs.width - appWindow->frameLeft - appWindow->frameRight;
+			const int height = attrs.height - appWindow->frameTop - appWindow->frameBottom;
+			if (width <= 0 || height <= 0)
+			{
+				xf_rail_return_window(appWindow, FALSE);
+				return TRUE;
+			}
+			const BOOL resized = width != appWindow->width || height != appWindow->height;
 			/*
 			 * ConfigureNotify coordinates are expressed relative to the window parent.
 			 * Translate these to root window coordinates.
 			 */
 			XTranslateCoordinates(xfc->display, appWindow->handle, RootWindowOfScreen(xfc->screen),
 			                      0, 0, &appWindow->x, &appWindow->y, &childWindow);
-			appWindow->width = event->width;
-			appWindow->height = event->height;
+			appWindow->x += appWindow->frameLeft;
+			appWindow->y += appWindow->frameTop;
+			appWindow->width = width;
+			appWindow->height = height;
 
-			xf_AppWindowResize(xfc, appWindow);
+			if (resized)
+				xf_AppWindowResize(xfc, appWindow);
+
+			/* Keep the locally resized window hittable until the server sends its new shape. */
+			if ((appWindow->local_move.state == LMS_ACTIVE) &&
+			    (appWindow->local_move.direction <= NET_WM_MOVERESIZE_SIZE_LEFT))
+			{
+				xf_ClearWindowVisibilityRects(xfc, appWindow);
+				/* The WM owns the drag now. End the server-local resize so every edge can
+				 * receive live layout updates through the ordinary geometry path. */
+				if (!xf_rail_end_local_move(xfc, appWindow))
+				{
+					xf_rail_return_window(appWindow, FALSE);
+					return FALSE;
+				}
+				/* Retain the latest WM bounds while waiting for Server Move/Size End. */
+				appWindow->geometryPending = TRUE;
+			}
 
 			/*
 			 * Additional checks for not in a local move and not ignoring configure to send
@@ -904,13 +937,13 @@ static BOOL xf_event_ConfigureNotify(xfContext* xfc, const XConfigureEvent* even
 			if (appWindow->decorations)
 			{
 				/* moving resizing using window decoration */
-				xf_rail_adjust_position(xfc, appWindow);
+				xf_rail_queue_position(appWindow);
 			}
 			else
 			{
 				if ((!event->send_event || appWindow->local_move.state == LMS_NOT_ACTIVE) &&
 				    !appWindow->rail_ignore_configure && xfc->focused)
-					xf_rail_adjust_position(xfc, appWindow);
+					xf_rail_queue_position(appWindow);
 			}
 		}
 		xf_rail_return_window(appWindow, FALSE);
@@ -1442,8 +1475,9 @@ BOOL xf_event_update_screen(freerdp* instance)
 	{
 		xfAppWindow* appWindow = xf_AppWindowFromX11Window(xfc, xfc->exposedWindow);
 		if (appWindow)
-			xf_UpdateWindowArea(xfc, appWindow, xfc->exposedArea.x, xfc->exposedArea.y,
-			                    xfc->exposedArea.w, xfc->exposedArea.h);
+			xf_UpdateWindowArea(xfc, appWindow, xfc->exposedArea.x - appWindow->frameLeft,
+			                    xfc->exposedArea.y - appWindow->frameTop, xfc->exposedArea.w,
+			                    xfc->exposedArea.h);
 		xf_rail_return_window(appWindow, FALSE);
 	}
 	return TRUE;

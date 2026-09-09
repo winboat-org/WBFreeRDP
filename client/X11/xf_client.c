@@ -1662,7 +1662,9 @@ static DWORD WINAPI xf_client_thread(LPVOID param)
 		if (xfc->window)
 			xf_floatbar_hide_and_show(xfc->window->floatbar);
 
-		waitStatus = WaitForMultipleObjects(nCount, handles, FALSE, INFINITE);
+		waitStatus = WaitForMultipleObjects(
+		    nCount, handles, FALSE,
+		    xf_rail_has_pending_positions(xfc) ? XF_RAIL_POSITION_INTERVAL_MS : INFINITE);
 
 		if (waitStatus == WAIT_FAILED)
 			break;
@@ -1693,6 +1695,7 @@ static DWORD WINAPI xf_client_thread(LPVOID param)
 
 		if (!handle_window_events(instance))
 			break;
+		xf_rail_check_pending_positions(xfc);
 	}
 
 	if (!exit_code)
