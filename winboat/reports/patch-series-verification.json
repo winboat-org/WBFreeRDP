@@ -75,6 +75,26 @@
     {
       "name": "0019-x11-wait-for-window-content-before-desktop-repaints.patch",
       "sha256": "16c31e4623447749350497a1907695769be988652d536b488b10df0e07ec6a29"
+    },
+    {
+      "name": "0020-x11-clipboard-owner-targets.patch",
+      "sha256": "fe1b43ff0d4e146ccfaacd4954ee56f8aeca88564d2d17428c07332227ba53b7"
+    },
+    {
+      "name": "0021-x11-transient-frame-order.patch",
+      "sha256": "94c7289fc85dd64aff292698d21780f0cf764a79433ce9a731727c3dfd5c7779"
+    },
+    {
+      "name": "0022-x11-packed-raw-valuators.patch",
+      "sha256": "ea6d2bdfa6f39102b789a67c9a12b6a612c500c4dbf2fa773b010de2cf4bf3fc"
+    },
+    {
+      "name": "0023-x11-offset-workarea-clipping.patch",
+      "sha256": "ee5d795a2452288f7b637c84de02f5436b761d152dec2136a89f262715e3e6c6"
+    },
+    {
+      "name": "0024-x11-fixed-dialog-size-hints.patch",
+      "sha256": "79f7e7309cca61df70e29c1ba012618962e04223234653b497f82c5fee7b7ae9"
     }
   ],
   "comparedFiles": 2940,

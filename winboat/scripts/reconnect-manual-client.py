@@ -18,6 +18,7 @@ parser.add_argument('binary')
 parser.add_argument('label')
 parser.add_argument('--trace-dir', type=Path)
 parser.add_argument('--title', default='Desktop - File Explorer')
+parser.add_argument('--clipboard-trace', action='store_true')
 args = parser.parse_args()
 for value in [args.binary, args.label]:
     assert value and all(c.isalnum() or c in '-_' for c in value)
@@ -41,6 +42,8 @@ command = [str(binary), '/u:' + config['USERNAME'], '/p:' + config['PASSWORD'],
            '+auto-reconnect', '/auto-reconnect-max-retries:10',
            '/wm-class:winboat-WindowsExplorer',
            '/app:program:C:\\Windows\\explorer.exe,name:Windows Explorer', '/log-level:WARN']
+if args.clipboard_trace:
+    command.append('/log-filters:com.freerdp.client.x11.cliprdr:DEBUG,com.freerdp.channels.cliprdr.client:DEBUG')
 env = dict(os.environ)
 if args.trace_dir:
     args.trace_dir.mkdir(parents=True, exist_ok=True)

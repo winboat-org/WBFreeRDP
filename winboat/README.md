@@ -6,8 +6,8 @@
 
 This workspace collects the existing WinBoat FreeRDP work and the investigation
 started on 2026-09-08. It contains an ordered patch series, local development
-builds, reproducible test fixtures, private raw evidence, and reports. The tested source is published on this repository’s `winboat-3.30` branch;
-it is not a replacement system package.
+builds, reproducible test fixtures, private raw evidence, and reports. It is not
+a published FreeRDP fork or a replacement system package.
 
 The normal WinBoat executable/configuration remains unchanged. Existing
 `WinBoat/temp/freerdp-*` and `temp/rdp-gpu-accel` directories were moved under
@@ -40,6 +40,11 @@ Apply `patches/series` in order to pristine **FreeRDP 3.30.0**:
 | 0017 | Keep Windows focus when switching between RemoteApp windows | New |
 | 0018 | Preserve RemoteApp alpha visuals through logon transitions | New |
 | 0019 | Prevent new windows from repainting stale sign-in pixels | New |
+| 0020 | Select image formats actually offered by the X11 clipboard owner | New |
+| 0021 | Classify window styles before synchronizing resize frames | New |
+| 0022 | Decode packed XI2 raw-motion valuators correctly | New |
+| 0023 | Clip window bounds relative to the desktop origin | New |
+| 0024 | Stop fixed-size dialog tracking hints from causing geometry drift | New |
 
 The first three patches reproduce the previously reviewed resume build.
 `patches/winboat/` contains separate WinBoat integration patches; these do not
@@ -165,3 +170,5 @@ python3 scripts/build-comparison-client.py xfreerdp-before-clock --through 11
 
 The comparison manifest records every applied patch hash. This removes the need
 to reuse an unexplained historical binary for a before/after comparison.
+
+The ten-area issue follow-up and remaining limitations are in [reports/issue-fixes.md](reports/issue-fixes.md).

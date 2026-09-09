@@ -1,3 +1,4 @@
+#include <X11/XKBlib.h>
 #include <assert.h>
 #include <inttypes.h>
 #include <locale.h>
@@ -142,6 +143,17 @@ int main(int argc, char** argv)
                 XCloseIM(old);
                 xf_keyboard_unicode_destroyed(old, (XPointer)&xfc, NULL);
             }
+            continue;
+        }
+        if (*token == 'g') {
+            unsigned group = (unsigned)atoi(token + 1);
+            assert(group < 4 && XkbLockGroup(d, XkbUseCoreKbd, group));
+            XSync(d, False);
+            XkbStateRec actual;
+            assert(XkbGetState(d, XkbUseCoreKbd, &actual) == Success);
+            assert(actual.group == group);
+            state = XkbBuildCoreState(state & 0xff, actual.group);
+            drain(&xfc);
             continue;
         }
         char operation = *token;

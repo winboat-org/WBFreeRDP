@@ -1,35 +1,26 @@
 {
-  "binarySha256": "270aaa93a98934cae24ba3d0789dcd918ede137a84661f86b305829c982a28f3",
-  "builtAtUtc": "2026-09-09T07:57:46.262158+00:00",
-  "patchCount": 19,
+  "binarySha256": "3861731e174624ac00c8e848c322a5af3ff06e7de0ff13a9eaa9ee50d90ac9f0",
+  "debugBinarySha256": "f41a3ed669e28035988678266ed90f07decf6f298ce9496521777ad8f0d5a11b",
+  "builtAtUtc": "2026-09-09T08:44:16.564593+00:00",
+  "patchCount": 24,
   "sourceFilesCompared": 2940,
-  "localGroupsPassed": 24,
+  "localGroupsPassed": 30,
   "localGroupsFailed": 0,
-  "localStartedAtUtc": "2026-09-09T07:58:01.047949+00:00",
-  "verifiedAtUtc": "2026-09-09T07:59:42.971974+00:00",
+  "localStartedAtUtc": "2026-09-09T08:44:17.549363+00:00",
+  "verifiedAtUtc": "2026-09-09T08:50:08.881906+00:00",
   "integration": {
-    "tooltipTransparency": {
-      "label": "release-synthetic",
-      "shadowFrames": 613,
-      "shadowWindows": 6,
-      "coloredShadowFrames": 0,
-      "transparentInitialFrames": 15,
-      "depths": [
-        32
-      ],
-      "layeredFrames": 480,
-      "layeredPremultipliedAlphaCorrect": true
-    },
-    "report": "reports/tooltip-transparency.md"
+    "imageClipboard": "final release PNG/BMP/BMP-alias pixels match",
+    "paintnetGeometry": "5.1.12 Layer Properties, three fixed ten-second captures including final release",
+    "nativeDrag": "2 downs, 2 ups, 40 captured moves",
+    "failedConnect": "4 early transport cases; authenticated FUSE teardown not covered",
+    "report": "reports/issue-fixes.md"
   },
-  "previous17PatchValidation": {
-    "summary": "reports/validation-summary-17patch.json",
-    "notRepeatedForPatches18And19": [
-      "full Explorer click/keyboard/native-switch matrix",
-      "CapCut maximize cycles",
-      "20-minute reconnect soak",
-      "nine-case typing matrix",
-      "four-case D3D11 matrix"
-    ]
-  }
+  "previous19PatchValidation": "reports/validation-summary-19patch.json",
+  "notRepeatedForPatches20Through24": [
+    "full Explorer click/keyboard/native-switch matrix",
+    "CapCut maximize cycles",
+    "20-minute reconnect soak",
+    "nine-case guest typing matrix",
+    "four-case D3D11 matrix"
+  ]
 }

@@ -1,0 +1,1129 @@
+{
+  "clipboardTargets": {
+    "functionSha256": "3dd72ff482ae41eea3d8e518df0f3ca3ffc8477c05a7d70227573c02cd3eace5",
+    "returncode": 0,
+    "cases": [
+      {
+        "name": "png_only_requests_png_for_dib",
+        "pass": true
+      },
+      {
+        "name": "png_only_requests_png_for_html",
+        "pass": true
+      },
+      {
+        "name": "jpeg_only_requests_jpeg",
+        "pass": true
+      },
+      {
+        "name": "bitmap_alias_is_respected",
+        "pass": true
+      },
+      {
+        "name": "bitmap_owner_still_works",
+        "pass": true
+      },
+      {
+        "name": "mixed_images_request_an_offered_target",
+        "pass": true
+      },
+      {
+        "name": "new_text_owner_clears_old_image_targets",
+        "pass": true
+      },
+      {
+        "name": "text_owner_still_works",
+        "pass": true
+      },
+      {
+        "name": "unoffered_text_alias_is_not_requested",
+        "pass": true
+      },
+      {
+        "name": "empty_owner_clears_targets",
+        "pass": true
+      },
+      {
+        "name": "negotiated_raw_transfer_still_resolves",
+        "pass": true
+      }
+    ]
+  },
+  "transientFrame": [
+    {
+      "variant": "upstream",
+      "cases": 4,
+      "failures": 3,
+      "returncode": 1,
+      "style_frame_order": [],
+      "extracted_sha256": "bc0ea56b07d869bc65699ea42c495057dee2992749a46b6d71ec795bfac9bada",
+      "source_sha256": "dc1e57ca311cb444e48cc2b1f137bc98ab7fffc999630e553f7dfdd7278a5318",
+      "checks": [
+        "PASS tool classified transient",
+        "FAIL tool-to-regular resets transient",
+        "FAIL popup-to-modal resets transient",
+        "FAIL noactivate-to-topmost resets transient"
+      ]
+    },
+    {
+      "variant": "baseline",
+      "cases": 13,
+      "failures": 9,
+      "returncode": 1,
+      "style_frame_order": [
+        "xf_SyncResizeFrame",
+        "xf_SetWindowStyle"
+      ],
+      "extracted_sha256": "d6deafb4db0b6714b81b3a96a3e9148713ce8f2a9476ac53c750587d47316db4",
+      "source_sha256": "e057cacc6da261d9b02f96615eac549fc55f4967a45b0d1b513f95f11cfc4dde",
+      "checks": [
+        "PASS tool classified transient",
+        "FAIL tool-to-regular resets transient",
+        "FAIL popup-to-modal resets transient",
+        "FAIL noactivate-to-topmost resets transient",
+        "FAIL new tool frame zero before first map",
+        "PASS new regular frame established before first map",
+        "FAIL regular-to-tool frame cleared within update",
+        "FAIL tool-to-regular frame restored within update",
+        "PASS 1000 stable style updates do not drift or shrink",
+        "FAIL pending style transition retains outer bounds",
+        "FAIL pending style transition rebases request",
+        "PASS pending reverse transition restores content bounds",
+        "FAIL 24bit style reset without artificial frame"
+      ]
+    },
+    {
+      "variant": "candidate",
+      "cases": 13,
+      "failures": 0,
+      "returncode": 0,
+      "style_frame_order": [
+        "xf_SetWindowStyle",
+        "xf_SyncResizeFrame"
+      ],
+      "extracted_sha256": "a53289a235fd83cecbbbab63d424f0418647dbf090e641ea1e69ceef805f2a88",
+      "source_sha256": "eb007faf5ffbcdd8add90d7e236d2b25e4e999565acd64f77d0ceb2cf88d36f0",
+      "checks": [
+        "PASS tool classified transient",
+        "PASS tool-to-regular resets transient",
+        "PASS popup-to-modal resets transient",
+        "PASS noactivate-to-topmost resets transient",
+        "PASS new tool frame zero before first map",
+        "PASS new regular frame established before first map",
+        "PASS regular-to-tool frame cleared within update",
+        "PASS tool-to-regular frame restored within update",
+        "PASS 1000 stable style updates do not drift or shrink",
+        "PASS pending style transition retains outer bounds",
+        "PASS pending style transition rebases request",
+        "PASS pending reverse transition restores content bounds",
+        "PASS 24bit style reset without artificial frame"
+      ]
+    }
+  ],
+  "rawMotion": [
+    {
+      "variant": "baseline",
+      "cases": 10,
+      "failures": 4,
+      "checks": [
+        {
+          "case": 0,
+          "returncode": 0,
+          "pass": true,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=0 expected=7,-4 actual=7,-4 calls=1 pass=1"
+        },
+        {
+          "case": 1,
+          "returncode": 0,
+          "pass": true,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=1 expected=7,0 actual=7,0 calls=1 pass=1"
+        },
+        {
+          "case": 2,
+          "returncode": 1,
+          "pass": false,
+          "asan_heap_overflow": true,
+          "invalid_null_load": false,
+          "stdout": ""
+        },
+        {
+          "case": 3,
+          "returncode": 1,
+          "pass": false,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=3 expected=0,-4 actual=0,777 calls=1 pass=0"
+        },
+        {
+          "case": 4,
+          "returncode": 0,
+          "pass": true,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=4 expected=0,0 actual=0,0 calls=1 pass=1"
+        },
+        {
+          "case": 5,
+          "returncode": 1,
+          "pass": false,
+          "asan_heap_overflow": false,
+          "invalid_null_load": true,
+          "stdout": ""
+        },
+        {
+          "case": 6,
+          "returncode": 0,
+          "pass": true,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=6 expected=-14,19 actual=-14,19 calls=1 pass=1"
+        },
+        {
+          "case": 7,
+          "returncode": 0,
+          "pass": true,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=7 expected=7,-4 actual=0,0 calls=0 pass=1"
+        },
+        {
+          "case": 8,
+          "returncode": 0,
+          "pass": true,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=8 expected=7,-4 actual=0,0 calls=0 pass=1"
+        },
+        {
+          "case": 9,
+          "returncode": 1,
+          "pass": false,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=9 expected=7,-4 actual=7,-4 calls=1 pass=0"
+        }
+      ],
+      "production_source_sha256": "a0c54cd4490929eafade11506b7761e4a018b9e2d8bb318ae5bfc200f36d5bd1",
+      "extracted_case_sha256": "8c8e270dbc3f766fe9ce686f25982cacd828cdaeb6d641241236d10280540d6e"
+    },
+    {
+      "variant": "candidate",
+      "cases": 10,
+      "failures": 0,
+      "checks": [
+        {
+          "case": 0,
+          "returncode": 0,
+          "pass": true,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=0 expected=7,-4 actual=7,-4 calls=1 pass=1"
+        },
+        {
+          "case": 1,
+          "returncode": 0,
+          "pass": true,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=1 expected=7,0 actual=7,0 calls=1 pass=1"
+        },
+        {
+          "case": 2,
+          "returncode": 0,
+          "pass": true,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=2 expected=0,-4 actual=0,-4 calls=1 pass=1"
+        },
+        {
+          "case": 3,
+          "returncode": 0,
+          "pass": true,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=3 expected=0,-4 actual=0,-4 calls=1 pass=1"
+        },
+        {
+          "case": 4,
+          "returncode": 0,
+          "pass": true,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=4 expected=0,0 actual=0,0 calls=1 pass=1"
+        },
+        {
+          "case": 5,
+          "returncode": 0,
+          "pass": true,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=5 expected=0,0 actual=0,0 calls=1 pass=1"
+        },
+        {
+          "case": 6,
+          "returncode": 0,
+          "pass": true,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=6 expected=-14,19 actual=-14,19 calls=1 pass=1"
+        },
+        {
+          "case": 7,
+          "returncode": 0,
+          "pass": true,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=7 expected=7,-4 actual=0,0 calls=0 pass=1"
+        },
+        {
+          "case": 8,
+          "returncode": 0,
+          "pass": true,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=8 expected=7,-4 actual=0,0 calls=0 pass=1"
+        },
+        {
+          "case": 9,
+          "returncode": 0,
+          "pass": true,
+          "asan_heap_overflow": false,
+          "invalid_null_load": false,
+          "stdout": "case=9 expected=7,-4 actual=7,-4 calls=1 pass=1"
+        }
+      ],
+      "production_source_sha256": "1b430c0924bc976a9e09bf0c31caf4b996f4eccd809be23aba00ff71ad7e6dc5",
+      "extracted_case_sha256": "187ce0622c0d9720391a01796e705d9a72d84cd0d076b0f22f8cee1593f5b69e"
+    }
+  ],
+  "workareaClip": [
+    {
+      "cases": 36,
+      "failures": 14,
+      "top30_y20_h400_result": 420,
+      "variant": "baseline",
+      "extracted_sha256": "0e13c025303c35e12f85710b65131549dde359505368204882598cdcb90dec27"
+    },
+    {
+      "cases": 36,
+      "failures": 0,
+      "top30_y20_h400_result": 390,
+      "variant": "candidate",
+      "extracted_sha256": "c7da348a1ccc3e2a3b5e05977000c2753b4bd85d5d9c770b275ad415b8569143"
+    }
+  ],
+  "fixedDialogHints": {
+    "cases": [
+      {
+        "variant": "before",
+        "case": 0,
+        "resizable": 0,
+        "flags": 112,
+        "pass": 0
+      },
+      {
+        "variant": "before",
+        "case": 1,
+        "resizable": 1,
+        "flags": 112,
+        "pass": 1
+      },
+      {
+        "variant": "before",
+        "case": 2,
+        "resizable": 0,
+        "flags": 112,
+        "pass": 0
+      },
+      {
+        "variant": "before",
+        "case": 3,
+        "resizable": 1,
+        "flags": 80,
+        "pass": 1
+      },
+      {
+        "variant": "fixed",
+        "case": 0,
+        "resizable": 0,
+        "flags": 64,
+        "pass": 1
+      },
+      {
+        "variant": "fixed",
+        "case": 1,
+        "resizable": 1,
+        "flags": 112,
+        "pass": 1
+      },
+      {
+        "variant": "fixed",
+        "case": 2,
+        "resizable": 0,
+        "flags": 64,
+        "pass": 1
+      },
+      {
+        "variant": "fixed",
+        "case": 3,
+        "resizable": 1,
+        "flags": 80,
+        "pass": 1
+      }
+    ],
+    "sourceSha256": [
+      "ee69f732935f9a340607dc602e6e0bb62c6f5fae5e5f85dadcf09cbffe376569",
+      "315a1ca70678da6571cf86d07fe00c7fa4785a74db54ee15c6900ad75e45f8b5"
+    ]
+  },
+  "dynamicKeyboard": {
+    "cases": [
+      {
+        "unicode": true,
+        "result": {
+          "units": [
+            121,
+            121,
+            122,
+            122,
+            121,
+            121
+          ],
+          "flags": [
+            0,
+            32768,
+            0,
+            32768,
+            0,
+            32768
+          ],
+          "raw": [],
+          "opens": 1,
+          "closes": 1,
+          "filteredPress": 0,
+          "filteredRelease": 3
+        },
+        "passed": true
+      },
+      {
+        "unicode": false,
+        "result": {
+          "units": [],
+          "flags": [],
+          "raw": [
+            [
+              29,
+              1
+            ],
+            [
+              29,
+              0
+            ],
+            [
+              29,
+              1
+            ],
+            [
+              29,
+              0
+            ],
+            [
+              29,
+              1
+            ],
+            [
+              29,
+              0
+            ]
+          ],
+          "opens": 0,
+          "closes": 0,
+          "filteredPress": 0,
+          "filteredRelease": 0
+        },
+        "passed": true
+      }
+    ],
+    "sourceSha256": "f555f3f5cc22f1b633b55d5ca1a0966a5ddb1a8188cf360edc3466aa9497925a",
+    "scope": "Host alphabetic group changes only; no guest language activation or Japanese IME conversion"
+  },
+  "failedConnect": {
+    "binarySha256": "3861731e174624ac00c8e848c322a5af3ff06e7de0ff13a9eaa9ee50d90ac9f0",
+    "cases": [
+      {
+        "mode": "refused",
+        "clipboard": true,
+        "returncode": 141,
+        "seconds": 0.062,
+        "newMounts": 0,
+        "assertion": false,
+        "passed": true
+      },
+      {
+        "mode": "refused",
+        "clipboard": false,
+        "returncode": 141,
+        "seconds": 0.047,
+        "newMounts": 0,
+        "assertion": false,
+        "passed": true
+      },
+      {
+        "mode": "accepted-then-closed",
+        "clipboard": true,
+        "returncode": 141,
+        "seconds": 0.055,
+        "newMounts": 0,
+        "assertion": false,
+        "passed": true
+      },
+      {
+        "mode": "accepted-then-closed",
+        "clipboard": false,
+        "returncode": 141,
+        "seconds": 0.055,
+        "newMounts": 0,
+        "assertion": false,
+        "passed": true
+      }
+    ],
+    "passAll": true,
+    "scope": "Early transport failure only; no authenticated-session/FUSE initialization claim"
+  },
+  "nativeDrag": {
+    "downs": 2,
+    "ups": 2,
+    "moves": 40,
+    "capturedMoves": 40,
+    "input": "dotool Wayland pointer",
+    "passed": true
+  },
+  "liveImageClipboard": {
+    "dib-candidate": {
+      "binarySha256": "6212b6c213edc743d5b8675b81217a8a63fa7c03aafea6d2b73686128e3fa740",
+      "cases": [
+        {
+          "case": "png",
+          "target": "image/png",
+          "guest": {
+            "id": "1",
+            "hasImage": true,
+            "width": 37,
+            "height": 29,
+            "sha256": "285b30ecf9bd907f115c9060d94021dc643c6c0968d94363786e31ac627a9cb5",
+            "formats": [
+              "DeviceIndependentBitmap",
+              "HTML Format",
+              "CanIncludeInClipboardHistory",
+              "CanUploadToCloudClipboard"
+            ],
+            "dibBytes": 3302,
+            "bits": 24
+          },
+          "expectedSha256": "285b30ecf9bd907f115c9060d94021dc643c6c0968d94363786e31ac627a9cb5",
+          "passCase": true
+        },
+        {
+          "case": "bmp",
+          "target": "image/bmp",
+          "guest": {
+            "id": "2",
+            "hasImage": true,
+            "width": 37,
+            "height": 29,
+            "sha256": "285b30ecf9bd907f115c9060d94021dc643c6c0968d94363786e31ac627a9cb5",
+            "formats": [
+              "DeviceIndependentBitmap",
+              "HTML Format",
+              "CanIncludeInClipboardHistory",
+              "CanUploadToCloudClipboard"
+            ],
+            "dibBytes": 3288,
+            "bits": 24
+          },
+          "expectedSha256": "285b30ecf9bd907f115c9060d94021dc643c6c0968d94363786e31ac627a9cb5",
+          "passCase": true
+        },
+        {
+          "case": "bmp-alias",
+          "target": "image/x-MS-bmp",
+          "guest": {
+            "id": "3",
+            "hasImage": true,
+            "width": 37,
+            "height": 29,
+            "sha256": "285b30ecf9bd907f115c9060d94021dc643c6c0968d94363786e31ac627a9cb5",
+            "formats": [
+              "DeviceIndependentBitmap",
+              "HTML Format",
+              "CanIncludeInClipboardHistory",
+              "CanUploadToCloudClipboard"
+            ],
+            "dibBytes": 3288,
+            "bits": 24
+          },
+          "expectedSha256": "285b30ecf9bd907f115c9060d94021dc643c6c0968d94363786e31ac627a9cb5",
+          "passCase": true
+        }
+      ]
+    },
+    "large-candidate": {
+      "binarySha256": "6212b6c213edc743d5b8675b81217a8a63fa7c03aafea6d2b73686128e3fa740",
+      "cases": [
+        {
+          "case": "bmp",
+          "target": "image/bmp",
+          "guest": {
+            "id": "1",
+            "hasImage": true,
+            "width": 1024,
+            "height": 768,
+            "sha256": "b79b548ea5f65cce02ba4a0368246b158be58215248cbfb47b769017a4643170",
+            "formats": [
+              "DeviceIndependentBitmap",
+              "HTML Format",
+              "CanIncludeInClipboardHistory",
+              "CanUploadToCloudClipboard"
+            ],
+            "dibBytes": 2359336,
+            "bits": 24
+          },
+          "expectedSha256": "b79b548ea5f65cce02ba4a0368246b158be58215248cbfb47b769017a4643170",
+          "passCase": true
+        }
+      ]
+    },
+    "private-candidate": {
+      "binarySha256": "6212b6c213edc743d5b8675b81217a8a63fa7c03aafea6d2b73686128e3fa740",
+      "cases": [
+        {
+          "case": "SET_PRIVATE",
+          "guest": {
+            "id": "2",
+            "hasPrivate": true,
+            "sha256": "84266f40c5baf4843c29901d678391401b7fa019c1147f5d84d9168b630c2ec0",
+            "formats": [
+              "UnicodeText",
+              "WBFreeRDP.PrivateClipboardProbe"
+            ]
+          },
+          "passCase": true
+        },
+        {
+          "case": "SET_PRIVATE_ONLY",
+          "guest": {
+            "id": "4",
+            "hasPrivate": true,
+            "sha256": "84266f40c5baf4843c29901d678391401b7fa019c1147f5d84d9168b630c2ec0",
+            "formats": [
+              "WBFreeRDP.PrivateClipboardProbe"
+            ]
+          },
+          "passCase": true
+        }
+      ]
+    },
+    "final24": {
+      "binarySha256": "3861731e174624ac00c8e848c322a5af3ff06e7de0ff13a9eaa9ee50d90ac9f0",
+      "cases": [
+        {
+          "case": "png",
+          "target": "image/png",
+          "guest": {
+            "id": "1",
+            "hasImage": true,
+            "width": 37,
+            "height": 29,
+            "sha256": "285b30ecf9bd907f115c9060d94021dc643c6c0968d94363786e31ac627a9cb5",
+            "formats": [
+              "DeviceIndependentBitmap",
+              "HTML Format",
+              "CanIncludeInClipboardHistory",
+              "CanUploadToCloudClipboard"
+            ],
+            "dibBytes": 3302,
+            "bits": 24
+          },
+          "expectedSha256": "285b30ecf9bd907f115c9060d94021dc643c6c0968d94363786e31ac627a9cb5",
+          "passCase": true
+        },
+        {
+          "case": "bmp",
+          "target": "image/bmp",
+          "guest": {
+            "id": "2",
+            "hasImage": true,
+            "width": 37,
+            "height": 29,
+            "sha256": "285b30ecf9bd907f115c9060d94021dc643c6c0968d94363786e31ac627a9cb5",
+            "formats": [
+              "DeviceIndependentBitmap",
+              "HTML Format",
+              "CanIncludeInClipboardHistory",
+              "CanUploadToCloudClipboard"
+            ],
+            "dibBytes": 3288,
+            "bits": 24
+          },
+          "expectedSha256": "285b30ecf9bd907f115c9060d94021dc643c6c0968d94363786e31ac627a9cb5",
+          "passCase": true
+        },
+        {
+          "case": "bmp-alias",
+          "target": "image/x-MS-bmp",
+          "guest": {
+            "id": "3",
+            "hasImage": true,
+            "width": 37,
+            "height": 29,
+            "sha256": "285b30ecf9bd907f115c9060d94021dc643c6c0968d94363786e31ac627a9cb5",
+            "formats": [
+              "DeviceIndependentBitmap",
+              "HTML Format",
+              "CanIncludeInClipboardHistory",
+              "CanUploadToCloudClipboard"
+            ],
+            "dibBytes": 3288,
+            "bits": 24
+          },
+          "expectedSha256": "285b30ecf9bd907f115c9060d94021dc643c6c0968d94363786e31ac627a9cb5",
+          "passCase": true
+        }
+      ]
+    }
+  },
+  "paintnet": {
+    "paintnet-native-before": {
+      "samples": 39,
+      "uniqueBounds": [
+        [
+          446,
+          382,
+          762,
+          626
+        ],
+        [
+          453,
+          382,
+          769,
+          626
+        ],
+        [
+          460,
+          382,
+          776,
+          626
+        ],
+        [
+          467,
+          382,
+          783,
+          626
+        ],
+        [
+          474,
+          382,
+          790,
+          626
+        ],
+        [
+          481,
+          382,
+          797,
+          626
+        ],
+        [
+          488,
+          382,
+          804,
+          626
+        ],
+        [
+          495,
+          382,
+          811,
+          626
+        ],
+        [
+          502,
+          382,
+          818,
+          626
+        ],
+        [
+          509,
+          382,
+          825,
+          626
+        ],
+        [
+          516,
+          382,
+          832,
+          626
+        ],
+        [
+          523,
+          382,
+          839,
+          626
+        ]
+      ],
+      "durationMs": 9750
+    },
+    "paintnet-reopen-candidate": {
+      "samples": 39,
+      "uniqueBounds": [
+        [
+          809,
+          395,
+          1125,
+          639
+        ],
+        [
+          816,
+          395,
+          1132,
+          639
+        ],
+        [
+          823,
+          395,
+          1139,
+          639
+        ],
+        [
+          830,
+          395,
+          1146,
+          639
+        ],
+        [
+          837,
+          395,
+          1153,
+          639
+        ],
+        [
+          844,
+          395,
+          1160,
+          639
+        ],
+        [
+          851,
+          395,
+          1167,
+          639
+        ],
+        [
+          858,
+          395,
+          1174,
+          639
+        ],
+        [
+          865,
+          395,
+          1181,
+          639
+        ],
+        [
+          872,
+          395,
+          1188,
+          639
+        ],
+        [
+          879,
+          395,
+          1195,
+          639
+        ],
+        [
+          886,
+          395,
+          1202,
+          639
+        ]
+      ],
+      "durationMs": 9750
+    },
+    "paintnet-reopen-trace": {
+      "samples": 39,
+      "uniqueBounds": [
+        [
+          809,
+          395,
+          1125,
+          639
+        ],
+        [
+          816,
+          395,
+          1132,
+          639
+        ],
+        [
+          823,
+          395,
+          1139,
+          639
+        ],
+        [
+          830,
+          395,
+          1146,
+          639
+        ],
+        [
+          837,
+          395,
+          1153,
+          639
+        ],
+        [
+          844,
+          395,
+          1160,
+          639
+        ],
+        [
+          851,
+          395,
+          1167,
+          639
+        ],
+        [
+          858,
+          395,
+          1174,
+          639
+        ],
+        [
+          865,
+          395,
+          1181,
+          639
+        ],
+        [
+          872,
+          395,
+          1188,
+          639
+        ],
+        [
+          879,
+          395,
+          1195,
+          639
+        ],
+        [
+          886,
+          395,
+          1202,
+          639
+        ],
+        [
+          893,
+          395,
+          1209,
+          639
+        ]
+      ],
+      "durationMs": 9750
+    },
+    "paintnet-reopen-fixed1": {
+      "samples": 39,
+      "uniqueBounds": [
+        [
+          802,
+          395,
+          1118,
+          639
+        ]
+      ],
+      "durationMs": 9750
+    },
+    "paintnet-reopen-fixed2": {
+      "samples": 39,
+      "uniqueBounds": [
+        [
+          802,
+          395,
+          1118,
+          639
+        ]
+      ],
+      "durationMs": 9750
+    },
+    "paintnet-reopen-release24": {
+      "samples": 40,
+      "uniqueBounds": [
+        [
+          802,
+          395,
+          1118,
+          639
+        ]
+      ],
+      "durationMs": 9750
+    }
+  },
+  "localGroups": [
+    {
+      "name": "build-xerror-baseline",
+      "returncode": 0,
+      "seconds": 2.622
+    },
+    {
+      "name": "build-layout-baseline",
+      "returncode": 0,
+      "seconds": 1.72
+    },
+    {
+      "name": "build-layout-fixed",
+      "returncode": 0,
+      "seconds": 0.618
+    },
+    {
+      "name": "fuzz-keyboard-parser",
+      "returncode": 0,
+      "seconds": 0.471
+    },
+    {
+      "name": "test-clipboard-dummy-window",
+      "returncode": 0,
+      "seconds": 0.618
+    },
+    {
+      "name": "test-clipboard-incr",
+      "returncode": 0,
+      "seconds": 0.718
+    },
+    {
+      "name": "test-clipboard-property",
+      "returncode": 0,
+      "seconds": 2.321
+    },
+    {
+      "name": "test-clipboard-queue",
+      "returncode": 0,
+      "seconds": 0.919
+    },
+    {
+      "name": "test-clipboard-targets",
+      "returncode": 0,
+      "seconds": 0.618
+    },
+    {
+      "name": "test-compose-keyboard",
+      "returncode": 0,
+      "seconds": 1.069
+    },
+    {
+      "name": "test-dynamic-keyboard",
+      "returncode": 0,
+      "seconds": 0.568
+    },
+    {
+      "name": "test-fixed-dialog-hints",
+      "returncode": 0,
+      "seconds": 0.368
+    },
+    {
+      "name": "test-focus-handoff",
+      "returncode": 0,
+      "seconds": 0.421
+    },
+    {
+      "name": "test-keyboard-layout",
+      "returncode": 0,
+      "seconds": 0.819
+    },
+    {
+      "name": "test-late-margins",
+      "returncode": 0,
+      "seconds": 0.568
+    },
+    {
+      "name": "test-map-events",
+      "returncode": 0,
+      "seconds": 0.468
+    },
+    {
+      "name": "test-pointer-window",
+      "returncode": 0,
+      "seconds": 1.169
+    },
+    {
+      "name": "test-rail-reconnect",
+      "returncode": 0,
+      "seconds": 0.468
+    },
+    {
+      "name": "test-raw-motion",
+      "returncode": 0,
+      "seconds": 1.319
+    },
+    {
+      "name": "test-rdp-test-proxy",
+      "returncode": 0,
+      "seconds": 0.668
+    },
+    {
+      "name": "test-render-regressions",
+      "returncode": 0,
+      "seconds": 0.419
+    },
+    {
+      "name": "test-resize-scheduler",
+      "returncode": 0,
+      "seconds": 0.267
+    },
+    {
+      "name": "test-resume-clock",
+      "returncode": 0,
+      "seconds": 0.468
+    },
+    {
+      "name": "test-tooltip-render",
+      "returncode": 0,
+      "seconds": 1.771
+    },
+    {
+      "name": "test-transient-frame",
+      "returncode": 0,
+      "seconds": 0.969
+    },
+    {
+      "name": "test-unicode-keyboard",
+      "returncode": 0,
+      "seconds": 1.82
+    },
+    {
+      "name": "test-window-size-hints",
+      "returncode": 0,
+      "seconds": 0.418
+    },
+    {
+      "name": "test-workarea-clip",
+      "returncode": 0,
+      "seconds": 0.217
+    },
+    {
+      "name": "test-x-error-client",
+      "returncode": 0,
+      "seconds": 5.175
+    },
+    {
+      "name": "test-x-error-handler",
+      "returncode": 0,
+      "seconds": 4.323
+    }
+  ]
+}

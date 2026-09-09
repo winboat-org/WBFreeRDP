@@ -1,11 +1,11 @@
 # Patch overview
 
-This work contains **19 FreeRDP patches**, **2 separate WinBoat integration
+This work contains **24 FreeRDP patches**, **2 separate WinBoat integration
 patches**, and **1 Helios/Mesa fix**. Status below is as of 2026-09-09.
 
 ## FreeRDP
 
-All 19 patches are included in the custom FreeRDP 3.30.0 build used for manual
+All 24 patches are included in the custom FreeRDP 3.30.0 build used for manual
 testing. Patches 1–3 preserve the earlier work; patch 7 is an upstream backport.
 This custom build does not replace normal WinBoat launches or the system package.
 
@@ -30,6 +30,11 @@ This custom build does not replace normal WinBoat launches or the system package
 | 17 | **Keep focus when switching remote windows** | Avoids unnecessary deactivation when focus moves between windows in the same remote session. Fixes the Explorer focus problem while preserving proper deactivation when switching to Linux apps. |
 | 18 | **Preserve transparency through reconnects** | Keeps the 32-bit alpha visual when RemoteApp temporarily displays the sign-in desktop, so later windows retain transparency. |
 | 19 | **Stop stale sign-in pixels appearing in tooltips** | Starts new windows with transparent backing pixels and waits for actual window content before using the shared desktop buffer. Preserves normal legacy painting and existing pixels during resize. |
+| 20 | **Paste the available image format** | Requests a PNG or BMP alias actually offered by the clipboard owner instead of blindly requesting BMP. |
+| 21 | **Recalculate transient window frames** | Clears stale style classification and updates frame geometry in the correct order. |
+| 22 | **Decode raw mouse axes correctly** | Handles XI2 packed valuators, including vertical-only motion. |
+| 23 | **Clip against the correct desktop origin** | Subtracts the distance outside a nonzero left/top edge. |
+| 24 | **Stop fixed-size dialog drift** | Avoids imposing Windows outer tracking sizes on smaller RAIL visible windows; verified with Paint.NET Layer Properties. |
 
 The complete ordered list is in [patches/series](patches/series). Build and test
 results are in [the validation report](reports/validation.md).
@@ -68,9 +73,11 @@ the preserved [Mesa patch](archive/rdp-gpu-accel/helios-evidence/mesa-map-failur
 ## Other experiments and historical patches
 
 An **experimental VAAPI decoding build** enables GPU video decoding through a
-process-local overlay. It is not part of the 19-patch series or the default
+process-local overlay. It is not part of the 24-patch series or the default
 client, and testing did not establish an overall speed improvement.
 
 The older archived resize/rendering patches are superseded development variants,
 rather than additional patches to apply. See [README.md](README.md) for the
 workspace layout and links to the investigation reports.
+
+See [the issue follow-up report](reports/issue-fixes.md) for baseline failures, live results and unresolved tracker cases.

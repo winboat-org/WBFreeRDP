@@ -1,0 +1,19 @@
+diff --git a/client/X11/xf_window.c b/client/X11/xf_window.c
+--- a/client/X11/xf_window.c
++++ b/client/X11/xf_window.c
+@@ -1003,13 +1003,13 @@
+ 
+ 	if (*x < xfc->vscreen.area.left)
+ 	{
+-		*width += *x;
++		*width += *x - xfc->vscreen.area.left;
+ 		*x = xfc->vscreen.area.left;
+ 	}
+ 
+ 	if (*y < xfc->vscreen.area.top)
+ 	{
+-		*height += *y;
++		*height += *y - xfc->vscreen.area.top;
+ 		*y = xfc->vscreen.area.top;
+ 	}
+ 

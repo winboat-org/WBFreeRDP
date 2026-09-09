@@ -19,7 +19,8 @@ c=r'''
 #include <stdlib.h>
 #define WINPR_ATTR_UNUSED __attribute__((unused))
 typedef struct {Display* display;} xfContext;
-typedef struct {Window handle;} xfAppWindow;
+typedef struct {Window handle;unsigned dwStyle;} xfAppWindow;
+#define WS_SIZEBOX 0x00040000
 /* FUNCTIONS */
 typedef struct {const char* name;int minw,minh,maxw,maxh,hasmax;} Case;
 int main(void){
@@ -40,7 +41,7 @@ int main(void){
   {"invalid-after-valid",1268,650,-1,-1,0},
  };
  Display* d=XOpenDisplay(NULL);if(!d)return 2;
- xfContext ctx={d};xfAppWindow app={XCreateSimpleWindow(d,DefaultRootWindow(d),0,0,500,300,0,0,0)};
+ xfContext ctx={d};xfAppWindow app={XCreateSimpleWindow(d,DefaultRootWindow(d),0,0,500,300,0,0,0),WS_SIZEBOX};
  unsigned failures[2]={0,0};
  printf("{\"cases\":[");
  for(unsigned v=0;v<2;v++)for(unsigned i=0;i<sizeof(cases)/sizeof(*cases);i++){

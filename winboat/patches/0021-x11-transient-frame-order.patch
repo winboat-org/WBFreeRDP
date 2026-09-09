@@ -1,0 +1,52 @@
+diff --git a/client/X11/xf_window.c b/client/X11/xf_window.c
+--- a/client/X11/xf_window.c
++++ b/client/X11/xf_window.c
+@@ -890,6 +890,8 @@
+ 	BOOL redirect = FALSE;
+ 
+ 	window_type = xfc->NET_WM_WINDOW_TYPE_NORMAL;
++	/* Style updates can turn an unmanaged popup back into a regular window. */
++	appWindow->is_transient = FALSE;
+ 
+ 	if ((ex_style & WS_EX_NOACTIVATE) || (ex_style & WS_EX_TOOLWINDOW))
+ 	{
+@@ -1039,6 +1041,8 @@
+ 
+ 	xf_SetWindowDecorations(xfc, appWindow->handle, appWindow->decorations);
+ 	xf_SetWindowStyle(xfc, appWindow, appWindow->dwStyle, appWindow->dwExStyle);
++	/* Classify the style before sizing its frame, and before mapping. */
++	xf_SyncResizeFrame(xfc, appWindow);
+ 	xf_SetWindowPID(xfc, appWindow->handle, 0);
+ 	xf_ShowWindow(xfc, appWindow, WINDOW_SHOW);
+ 	LogDynAndXClearWindow(xfc->log, xfc->display, appWindow->handle);
+diff --git a/client/X11/xf_rail.c b/client/X11/xf_rail.c
+--- a/client/X11/xf_rail.c
++++ b/client/X11/xf_rail.c
+@@ -603,7 +603,6 @@
+ 			appWindow->resizeMarginTop = windowState->resizeMarginTop;
+ 			appWindow->resizeMarginBottom = windowState->resizeMarginBottom;
+ 		}
+-		xf_SyncResizeFrame(xfc, appWindow);
+ 		xf_AppWindowInit(xfc, appWindow);
+ 	}
+ 
+@@ -756,6 +755,9 @@
+ 		if (appWindow->title)
+ 			xf_SetWindowText(xfc, appWindow, appWindow->title);
+ 	}
++
++	if (fieldFlags & (WINDOW_ORDER_STATE_NEW | WINDOW_ORDER_FIELD_STYLE))
++		xf_SetWindowStyle(xfc, appWindow, appWindow->dwStyle, appWindow->dwExStyle);
+ 
+ 	xf_SyncResizeFrame(xfc, appWindow);
+ 	if (position_or_size_updated)
+@@ -809,9 +811,6 @@
+ 		}
+ 	}
+ 
+-	if (fieldFlags & (WINDOW_ORDER_STATE_NEW | WINDOW_ORDER_FIELD_STYLE))
+-		xf_SetWindowStyle(xfc, appWindow, appWindow->dwStyle, appWindow->dwExStyle);
+-
+ 	/* We should only be using the visibility rects for shaping the window */
+ 	/*if (fieldFlags & WINDOW_ORDER_FIELD_WND_RECTS)
+ 	{

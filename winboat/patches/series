@@ -17,3 +17,8 @@
 0017-x11-keep-focus-between-remoteapp-windows.patch
 0018-x11-preserve-remoteapp-alpha-visual.patch
 0019-x11-wait-for-window-content-before-desktop-repaints.patch
+0020-x11-clipboard-owner-targets.patch
+0021-x11-transient-frame-order.patch
+0022-x11-packed-raw-valuators.patch
+0023-x11-offset-workarea-clipping.patch
+0024-x11-fixed-dialog-size-hints.patch
