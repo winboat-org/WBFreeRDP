@@ -603,7 +603,6 @@ static BOOL xf_rail_window_common(rdpContext* context, const WINDOW_ORDER_INFO* 
 			appWindow->resizeMarginTop = windowState->resizeMarginTop;
 			appWindow->resizeMarginBottom = windowState->resizeMarginBottom;
 		}
-		xf_SyncResizeFrame(xfc, appWindow);
 		xf_AppWindowInit(xfc, appWindow);
 	}
 
@@ -757,6 +756,9 @@ static BOOL xf_rail_window_common(rdpContext* context, const WINDOW_ORDER_INFO* 
 			xf_SetWindowText(xfc, appWindow, appWindow->title);
 	}
 
+	if (fieldFlags & (WINDOW_ORDER_STATE_NEW | WINDOW_ORDER_FIELD_STYLE))
+		xf_SetWindowStyle(xfc, appWindow, appWindow->dwStyle, appWindow->dwExStyle);
+
 	xf_SyncResizeFrame(xfc, appWindow);
 	if (position_or_size_updated)
 	{
@@ -808,9 +810,6 @@ static BOOL xf_rail_window_common(rdpContext* context, const WINDOW_ORDER_INFO* 
 			                   0, 0);
 		}
 	}
-
-	if (fieldFlags & (WINDOW_ORDER_STATE_NEW | WINDOW_ORDER_FIELD_STYLE))
-		xf_SetWindowStyle(xfc, appWindow, appWindow->dwStyle, appWindow->dwExStyle);
 
 	/* We should only be using the visibility rects for shaping the window */
 	/*if (fieldFlags & WINDOW_ORDER_FIELD_WND_RECTS)

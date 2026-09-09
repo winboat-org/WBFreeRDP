@@ -890,6 +890,8 @@ void xf_SetWindowStyle(xfContext* xfc, xfAppWindow* appWindow, UINT32 style, UIN
 	BOOL redirect = FALSE;
 
 	window_type = xfc->NET_WM_WINDOW_TYPE_NORMAL;
+	/* Style updates can turn an unmanaged popup back into a regular window. */
+	appWindow->is_transient = FALSE;
 
 	if ((ex_style & WS_EX_NOACTIVATE) || (ex_style & WS_EX_TOOLWINDOW))
 	{
@@ -1039,6 +1041,8 @@ int xf_AppWindowInit(xfContext* xfc, xfAppWindow* appWindow)
 
 	xf_SetWindowDecorations(xfc, appWindow->handle, appWindow->decorations);
 	xf_SetWindowStyle(xfc, appWindow, appWindow->dwStyle, appWindow->dwExStyle);
+	/* Classify the style before sizing its frame, and before mapping. */
+	xf_SyncResizeFrame(xfc, appWindow);
 	xf_SetWindowPID(xfc, appWindow->handle, 0);
 	xf_ShowWindow(xfc, appWindow, WINDOW_SHOW);
 	LogDynAndXClearWindow(xfc->log, xfc->display, appWindow->handle);
