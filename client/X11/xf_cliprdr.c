@@ -1173,9 +1173,25 @@ static void xf_cliprdr_provide_data_(xfClipboard* clipboard, const XSelectionEve
 
 	if (respond->property != None)
 	{
-		LogDynAndXChangeProperty_ex(xfc->log, file, fkt, line, xfc->display, respond->requestor,
-		                            respond->property, respond->target, 8, PropModeReplace, data,
-		                            WINPR_ASSERTING_INT_CAST(int32_t, size));
+		/* Request lengths include the six 4-byte units of the ChangeProperty header.
+		 * Keep each write within the core limit, even when BIG-REQUESTS is available.
+		 * The SelectionNotify follows all writes, so the requestor sees the complete property.
+		 */
+		const long maxRequestUnits = XMaxRequestSize(xfc->display);
+		WINPR_ASSERT(maxRequestUnits > 6);
+		const size_t chunkSize = MIN((size_t)(maxRequestUnits - 6) * 4, 64 * 1024);
+		size_t offset = 0;
+		int mode = PropModeReplace;
+		do
+		{
+			const size_t count = MIN((size_t)size - offset, chunkSize);
+			LogDynAndXChangeProperty_ex(xfc->log, file, fkt, line, xfc->display, respond->requestor,
+			                            respond->property, respond->target, 8, mode,
+			                            data ? &data[offset] : nullptr,
+			                            WINPR_ASSERTING_INT_CAST(int32_t, count));
+			offset += count;
+			mode = PropModeAppend;
+		} while (offset < size);
 	}
 }
 
