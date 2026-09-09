@@ -956,30 +956,19 @@ static BOOL xf_event_ConfigureNotify(xfContext* xfc, const XConfigureEvent* even
 static BOOL xf_event_MapNotify(xfContext* xfc, const XMapEvent* event, BOOL app)
 {
 	WINPR_ASSERT(xfc);
-	if (!app)
-	{
-		if (!xfc->window || event->window != xfc->window->handle)
-			return TRUE;
-		if (!gdi_send_suppress_output(xfc->common.context.gdi, FALSE))
-			return FALSE;
-	}
-	else
-	{
-		xfAppWindow* appWindow = xf_AppWindowFromX11Window(xfc, event->window);
+	WINPR_ASSERT(event);
 
-		if (appWindow)
-		{
-			/* local restore event */
-			/* This is now handled as part of the PropertyNotify
-			 * Doing this here would inhibit the ability to restore a maximized window
-			 * that is minimized back to the maximized state
-			 */
-			// xf_rail_send_client_system_command(xfc, appWindow->windowId, SC_RESTORE);
-			appWindow->is_mapped = TRUE;
-		}
+	/* RAIL windows can be mapped before the reconnect desktop switches to RemoteApp mode. */
+	xfAppWindow* appWindow = xf_AppWindowFromX11Window(xfc, event->window);
+	if (appWindow)
+	{
+		appWindow->is_mapped = TRUE;
 		xf_rail_return_window(appWindow, FALSE);
+		return TRUE;
 	}
 
+	if (!app && xfc->window && event->window == xfc->window->handle)
+		return gdi_send_suppress_output(xfc->common.context.gdi, FALSE);
 	return TRUE;
 }
 
@@ -988,23 +977,20 @@ static BOOL xf_event_UnmapNotify(xfContext* xfc, const XUnmapEvent* event, BOOL 
 	WINPR_ASSERT(xfc);
 	WINPR_ASSERT(event);
 
-	if (!app)
+	xfAppWindow* appWindow = xf_AppWindowFromX11Window(xfc, event->window);
+	if (appWindow)
 	{
-		/* Delayed events from destroyed RemoteApp windows are not desktop minimize events. */
-		if (!xfc->window || event->window != xfc->window->handle)
-			return TRUE;
+		appWindow->is_mapped = FALSE;
+		xf_rail_return_window(appWindow, FALSE);
+		return TRUE;
+	}
+
+	/* Delayed events from destroyed RemoteApp windows are not desktop minimize events. */
+	if (!app && xfc->window && event->window == xfc->window->handle)
+	{
 		xf_keyboard_release_all_keypress(xfc);
 		return gdi_send_suppress_output(xfc->common.context.gdi, TRUE);
 	}
-
-	{
-		xfAppWindow* appWindow = xf_AppWindowFromX11Window(xfc, event->window);
-
-		if (appWindow)
-			appWindow->is_mapped = FALSE;
-		xf_rail_return_window(appWindow, FALSE);
-	}
-
 	return TRUE;
 }
 
