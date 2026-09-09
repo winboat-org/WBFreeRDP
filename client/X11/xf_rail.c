@@ -508,6 +508,33 @@ static void window_state_log_style_int(wLog* log, const WINDOW_STATE_ORDER* wind
 	}
 }
 
+static void xf_rail_update_resize_margins(xfAppWindow* window, UINT32 flags,
+                                          const WINDOW_STATE_ORDER* state)
+{
+	BOOL changed = FALSE;
+	if (flags & WINDOW_ORDER_FIELD_RESIZE_MARGIN_X)
+	{
+		changed = window->resizeMarginLeft != state->resizeMarginLeft ||
+		          window->resizeMarginRight != state->resizeMarginRight;
+		window->resizeMarginLeft = state->resizeMarginLeft;
+		window->resizeMarginRight = state->resizeMarginRight;
+	}
+	if (flags & WINDOW_ORDER_FIELD_RESIZE_MARGIN_Y)
+	{
+		changed |= window->resizeMarginTop != state->resizeMarginTop ||
+		           window->resizeMarginBottom != state->resizeMarginBottom;
+		window->resizeMarginTop = state->resizeMarginTop;
+		window->resizeMarginBottom = state->resizeMarginBottom;
+	}
+	/* A reconnect can omit margins until the first resize response. Recalculate
+	 * the outstanding local request instead of accepting a border-sized drift. */
+	if (changed && window->geometryInFlight)
+	{
+		window->geometryInFlight = FALSE;
+		window->geometryPending = TRUE;
+	}
+}
+
 /* RemoteApp Core Protocol Extension */
 
 static BOOL xf_rail_window_common(rdpContext* context, const WINDOW_ORDER_INFO* orderInfo,
@@ -605,17 +632,7 @@ static BOOL xf_rail_window_common(rdpContext* context, const WINDOW_ORDER_INFO* 
 		appWindow->windowHeight = windowState->windowHeight;
 	}
 
-	if (fieldFlags & WINDOW_ORDER_FIELD_RESIZE_MARGIN_X)
-	{
-		appWindow->resizeMarginLeft = windowState->resizeMarginLeft;
-		appWindow->resizeMarginRight = windowState->resizeMarginRight;
-	}
-
-	if (fieldFlags & WINDOW_ORDER_FIELD_RESIZE_MARGIN_Y)
-	{
-		appWindow->resizeMarginTop = windowState->resizeMarginTop;
-		appWindow->resizeMarginBottom = windowState->resizeMarginBottom;
-	}
+	xf_rail_update_resize_margins(appWindow, fieldFlags, windowState);
 
 	if (fieldFlags & WINDOW_ORDER_FIELD_OWNER)
 	{

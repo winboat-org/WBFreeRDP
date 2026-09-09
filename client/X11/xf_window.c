@@ -1236,6 +1236,29 @@ void xf_SyncResizeFrame(xfContext* xfc, xfAppWindow* appWindow)
 	if (left == appWindow->frameLeft && top == appWindow->frameTop &&
 	    right == appWindow->frameRight && bottom == appWindow->frameBottom)
 		return;
+	/* Keep the user's outer X11 bounds when late margin metadata rebases an
+	 * outstanding resize. The content bounds use the new frame insets. */
+	if (appWindow->geometryPending || appWindow->geometryInFlight)
+	{
+		const int oldX = appWindow->x, oldY = appWindow->y;
+		const int oldWidth = appWindow->width, oldHeight = appWindow->height;
+		appWindow->x += left - appWindow->frameLeft;
+		appWindow->y += top - appWindow->frameTop;
+		appWindow->width =
+		    MAX(1, appWindow->width + appWindow->frameLeft + appWindow->frameRight - left - right);
+		appWindow->height =
+		    MAX(1, appWindow->height + appWindow->frameTop + appWindow->frameBottom - top - bottom);
+		if (!xf_AppWindowResize(xfc, appWindow))
+		{
+			appWindow->x = oldX;
+			appWindow->y = oldY;
+			appWindow->width = oldWidth;
+			appWindow->height = oldHeight;
+			return;
+		}
+		appWindow->geometryInFlight = FALSE;
+		appWindow->geometryPending = TRUE;
+	}
 	appWindow->frameLeft = left;
 	appWindow->frameTop = top;
 	appWindow->frameRight = right;
