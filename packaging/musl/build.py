@@ -74,10 +74,17 @@ def meson(name, source, *options):
 
 for entry in LOCK['archives']:
     archive = SOURCES / entry['url'].rsplit('/', 1)[1]
-    if not archive.exists():
-        run('curl', '--fail', '--location', '--retry', '3', entry['url'], '-o', archive)
-    if digest(archive) != entry['sha256']:
-        raise RuntimeError(f'Checksum mismatch: {archive}')
+    if not archive.exists() or digest(archive) != entry['sha256']:
+        for url in [*entry.get('mirrors', []), entry['url']]:
+            temporary = archive.with_name(archive.name + '.part')
+            result = subprocess.run(['curl', '--fail', '--location', '--retry', '3',
+                '--connect-timeout', '15', '--max-time', '180', url, '-o', str(temporary)])
+            if result.returncode == 0 and digest(temporary) == entry['sha256']:
+                temporary.replace(archive)
+                break
+            temporary.unlink(missing_ok=True)
+        else:
+            raise RuntimeError(f'Could not download a verified archive: {archive.name}')
     if not (SOURCES / entry['directory']).exists():
         run('tar', '--no-same-owner', '-xf', archive, '-C', SOURCES)
 

@@ -37,7 +37,10 @@
     {
       "directory": "pulseaudio-17.0",
       "url": "https://www.freedesktop.org/software/pulseaudio/releases/pulseaudio-17.0.tar.xz",
-      "sha256": "053794d6671a3e397d849e478a80b82a63cb9d8ca296bd35b73317bb5ceb87b5"
+      "sha256": "053794d6671a3e397d849e478a80b82a63cb9d8ca296bd35b73317bb5ceb87b5",
+      "mirrors": [
+        "https://distfiles.alpinelinux.org/distfiles/v3.23/pulseaudio-17.0.tar.xz"
+      ]
     },
     {
       "directory": "cups-2.4.14",
