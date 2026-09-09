@@ -998,6 +998,50 @@ static BOOL xf_keyboard_has_system_modifier(xfContext* xfc)
 	return mod.Ctrl || mod.Alt || mod.Super;
 }
 
+static WCHAR* xf_keyboard_lookup_unicode(xfContext* xfc, const XKeyEvent* event, size_t* length)
+{
+	char buffer[128] = WINPR_C_ARRAY_INIT;
+	char* text = buffer;
+	WCHAR* result = nullptr;
+	KeySym ignore = NoSymbol;
+	Status status = XLookupNone;
+	XKeyEvent ev = *event;
+	XIM xim = XOpenIM(xfc->display, nullptr, nullptr, nullptr);
+	if (!xim)
+	{
+		WLog_WARN(TAG, "Failed to XOpenIM");
+		return nullptr;
+	}
+	XIC xic = XCreateIC(xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, nullptr);
+	if (!xic)
+	{
+		WLog_WARN(TAG, "XCreateIC failed");
+		XCloseIM(xim);
+		return nullptr;
+	}
+
+	/* Xutf8LookupString returns a byte count, without requiring a terminating NUL. */
+	ev.type = KeyPress;
+	int capacity = sizeof(buffer);
+	int count = Xutf8LookupString(xic, &ev, text, capacity, &ignore, &status);
+	if ((status == XBufferOverflow) && (count > capacity))
+	{
+		capacity = count;
+		text = malloc((size_t)capacity);
+		if (text)
+			count = Xutf8LookupString(xic, &ev, text, capacity, &ignore, &status);
+	}
+	if (text && (count > 0) && (count <= capacity) &&
+	    ((status == XLookupChars) || (status == XLookupBoth)))
+		result = ConvertUtf8NToWCharAlloc(text, (size_t)count, length);
+
+	if (text != buffer)
+		free(text);
+	XDestroyIC(xic);
+	XCloseIM(xim);
+	return result;
+}
+
 void xf_keyboard_send_key(xfContext* xfc, BOOL down, BOOL repeat, const XKeyEvent* event)
 {
 	WINPR_ASSERT(xfc);
@@ -1024,45 +1068,12 @@ void xf_keyboard_send_key(xfContext* xfc, BOOL down, BOOL repeat, const XKeyEven
 		if (freerdp_settings_get_bool(xfc->common.context.settings, FreeRDP_UnicodeInput) &&
 		    !xf_keyboard_has_system_modifier(xfc))
 		{
-			wchar_t buffer[32] = WINPR_C_ARRAY_INIT;
-			int xwc = -1;
+			size_t length = 0;
+			WCHAR* text = nullptr;
+			if (rdp_scancode != RDP_SCANCODE_RETURN)
+				text = xf_keyboard_lookup_unicode(xfc, event, &length);
 
-			switch (rdp_scancode)
-			{
-				case RDP_SCANCODE_RETURN:
-					break;
-				default:
-				{
-					XIM xim = XOpenIM(xfc->display, nullptr, nullptr, nullptr);
-					if (!xim)
-					{
-						WLog_WARN(TAG, "Failed to XOpenIM");
-					}
-					else
-					{
-						XIC xic = XCreateIC(xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
-						                    nullptr);
-						if (!xic)
-						{
-							WLog_WARN(TAG, "XCreateIC failed");
-						}
-						else
-						{
-							KeySym ignore = WINPR_C_ARRAY_INIT;
-							Status return_status = 0;
-							XKeyEvent ev = *event;
-							ev.type = KeyPress;
-							xwc = XwcLookupString(xic, &ev, buffer, ARRAYSIZE(buffer), &ignore,
-							                      &return_status);
-							XDestroyIC(xic);
-						}
-						XCloseIM(xim);
-					}
-				}
-				break;
-			}
-
-			if (xwc < 1)
+			if (!text || (length == 0))
 			{
 				if (rdp_scancode == RDP_SCANCODE_UNKNOWN)
 					WLog_ERR(TAG, "Unknown key with X keycode 0x%02" PRIx8 "", event->keycode);
@@ -1071,15 +1082,15 @@ void xf_keyboard_send_key(xfContext* xfc, BOOL down, BOOL repeat, const XKeyEven
 			}
 			else
 			{
-				char str[3 * ARRAYSIZE(buffer)] = WINPR_C_ARRAY_INIT;
-				// NOLINTNEXTLINE(concurrency-mt-unsafe)
-				const size_t rc = wcstombs(str, buffer, ARRAYSIZE(buffer));
-
-				WCHAR wbuffer[ARRAYSIZE(buffer)] = WINPR_C_ARRAY_INIT;
-				(void)ConvertUtf8ToWChar(str, wbuffer, rc);
-				freerdp_input_send_unicode_keyboard_event(input, down ? 0 : KBD_FLAGS_RELEASE,
-				                                          wbuffer[0]);
+				/* Unicode RDP events carry UTF-16 code units, including both surrogates. */
+				for (size_t i = 0; i < length; i++)
+				{
+					if (!freerdp_input_send_unicode_keyboard_event(
+					        input, down ? 0 : KBD_FLAGS_RELEASE, text[i]))
+						break;
+				}
 			}
+			free(text);
 		}
 		else if (rdp_scancode == RDP_SCANCODE_UNKNOWN)
 			WLog_ERR(TAG, "Unknown key with X keycode 0x%02" PRIx8 "", event->keycode);
