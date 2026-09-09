@@ -1149,18 +1149,26 @@ void xf_SetWindowMinMaxInfo(xfContext* xfc, xfAppWindow* appWindow, WINPR_ATTR_U
 
 	if (size_hints)
 	{
-		size_hints->flags = PMinSize | PResizeInc;
-		size_hints->min_width = minTrackWidth;
-		size_hints->min_height = minTrackHeight;
-		/* Some applications produce negative maximum tracking sizes over RAIL.
-		 * Publishing those as X11 limits can prevent the WM from maximizing the
-		 * window. Only advertise a usable maximum-size pair. */
-		if ((maxTrackWidth > 0) && (maxTrackHeight > 0) &&
-		    (maxTrackWidth >= minTrackWidth) && (maxTrackHeight >= minTrackHeight))
+		size_hints->flags = PResizeInc;
+		/* Tracking limits describe the Windows outer rectangle. Fixed-size
+		 * dialogs can have invisible borders omitted from their RAIL surface;
+		 * imposing the larger minimum on X11 feeds a resize back to Windows.
+		 * Only resizable windows need interactive tracking constraints. */
+		if (appWindow->dwStyle & WS_SIZEBOX)
 		{
-			size_hints->flags |= PMaxSize;
-			size_hints->max_width = maxTrackWidth;
-			size_hints->max_height = maxTrackHeight;
+			size_hints->flags |= PMinSize;
+			size_hints->min_width = minTrackWidth;
+			size_hints->min_height = minTrackHeight;
+			/* Some applications produce negative maximum tracking sizes over RAIL.
+			 * Publishing those as X11 limits can prevent the WM from maximizing the
+			 * window. Only advertise a usable maximum-size pair. */
+			if ((maxTrackWidth > 0) && (maxTrackHeight > 0) &&
+			    (maxTrackWidth >= minTrackWidth) && (maxTrackHeight >= minTrackHeight))
+			{
+				size_hints->flags |= PMaxSize;
+				size_hints->max_width = maxTrackWidth;
+				size_hints->max_height = maxTrackHeight;
+			}
 		}
 		/* to speedup window drawing we need to select optimal value for sizing step. */
 		size_hints->width_inc = size_hints->height_inc = 1;
