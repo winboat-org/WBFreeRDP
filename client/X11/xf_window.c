@@ -1003,13 +1003,13 @@ static void xf_FixWindowCoordinates(xfContext* xfc, int* x, int* y, int* width, 
 
 	if (*x < xfc->vscreen.area.left)
 	{
-		*width += *x;
+		*width += *x - xfc->vscreen.area.left;
 		*x = xfc->vscreen.area.left;
 	}
 
 	if (*y < xfc->vscreen.area.top)
 	{
-		*height += *y;
+		*height += *y - xfc->vscreen.area.top;
 		*y = xfc->vscreen.area.top;
 	}
 
