@@ -678,9 +678,11 @@ xfWindow* xf_CreateDesktopWindow(xfContext* xfc, char* name, int width, int heig
 	window->handle = LogDynAndXCreateWindow(
 	    xfc->log, xfc->display, RootWindowOfScreen(xfc->screen),
 	    WINPR_ASSERTING_INT_CAST(int, xfc->workArea.x),
-	    WINPR_ASSERTING_INT_CAST(int, xfc->workArea.y), xfc->workArea.width, xfc->workArea.height,
-	    0, xfc->depth, InputOutput, xfc->visual,
-	    WINPR_ASSERTING_INT_CAST(uint32_t, xfc->attribs_mask), &xfc->attribs);
+	    WINPR_ASSERTING_INT_CAST(int, xfc->workArea.y),
+	    xfc->workArea.width ? xfc->workArea.width : (UINT32)MAX(1, width),
+	    xfc->workArea.height ? xfc->workArea.height : (UINT32)MAX(1, height), 0, xfc->depth,
+	    InputOutput, xfc->visual, WINPR_ASSERTING_INT_CAST(uint32_t, xfc->attribs_mask),
+	    &xfc->attribs);
 	window->shmid = shm_open(get_shm_id(), (O_CREAT | O_RDWR), (S_IREAD | S_IWRITE));
 
 	if (window->shmid < 0)

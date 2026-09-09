@@ -956,6 +956,8 @@ static BOOL xf_event_MapNotify(xfContext* xfc, const XMapEvent* event, BOOL app)
 	WINPR_ASSERT(xfc);
 	if (!app)
 	{
+		if (!xfc->window || event->window != xfc->window->handle)
+			return TRUE;
 		if (!gdi_send_suppress_output(xfc->common.context.gdi, FALSE))
 			return FALSE;
 	}
@@ -985,10 +987,13 @@ static BOOL xf_event_UnmapNotify(xfContext* xfc, const XUnmapEvent* event, BOOL 
 	WINPR_ASSERT(event);
 
 	if (!app)
+	{
+		/* Delayed events from destroyed RemoteApp windows are not desktop minimize events. */
+		if (!xfc->window || event->window != xfc->window->handle)
+			return TRUE;
 		xf_keyboard_release_all_keypress(xfc);
-
-	if (!app)
 		return gdi_send_suppress_output(xfc->common.context.gdi, TRUE);
+	}
 
 	{
 		xfAppWindow* appWindow = xf_AppWindowFromX11Window(xfc, event->window);

@@ -123,6 +123,8 @@ BOOL xf_rail_enable_remoteapp_mode(xfContext* xfc)
 		xfc->window = nullptr;
 
 		gdi->suppressOutput = old;
+		/* The temporary desktop may have paused updates when it was hidden. */
+		return gdi_send_suppress_output(gdi, FALSE);
 	}
 	return TRUE;
 }
@@ -1111,7 +1113,9 @@ xf_rail_monitored_desktop(WINPR_ATTR_UNUSED rdpContext* context,
 		    freerdp_settings_get_string(context->settings, FreeRDP_RemoteApplicationProgram);
 		if ((app != nullptr) && (strnlen(app, 1) > 0))
 		{
-			if (client_rail_server_start_cmd(xfc->rail) != CHANNEL_RC_OK)
+			/* Reconnect state was sent with the handshake, before the window snapshot. */
+			if (!freerdp_settings_get_bool(context->settings, FreeRDP_SessionHasBeenReconnected) &&
+			    (client_rail_server_start_cmd(xfc->rail) != CHANNEL_RC_OK))
 				return FALSE;
 			if (xf_rail_send_workarea(xfc) != CHANNEL_RC_OK)
 				return FALSE;
@@ -1407,6 +1411,33 @@ static void rail_window_free(void* value)
 	xf_DestroyWindow(appWindow->xfc, appWindow);
 }
 
+static UINT xf_rail_server_handshake(RailClientContext* rail,
+                                     WINPR_ATTR_UNUSED const RAIL_HANDSHAKE_ORDER* serverHandshake)
+{
+	WINPR_ASSERT(rail);
+	const xfContext* xfc = rail->custom;
+	WINPR_ASSERT(xfc);
+	const rdpSettings* settings = xfc->common.context.settings;
+	const RAIL_HANDSHAKE_ORDER handshake = { .buildNumber = freerdp_settings_get_uint32(
+		                                         settings, FreeRDP_ClientBuild) };
+	const UINT status = rail->ClientHandshake(rail, &handshake);
+	if (status != CHANNEL_RC_OK)
+		return status;
+
+	/* Client reconnect state must precede desktop synchronization. This helper
+	 * resends client parameters but does not execute the app on a reconnect. */
+	if (freerdp_settings_get_bool(settings, FreeRDP_SessionHasBeenReconnected))
+		return client_rail_server_start_cmd(rail);
+	return CHANNEL_RC_OK;
+}
+
+static UINT
+xf_rail_server_handshake_ex(RailClientContext* rail,
+                            WINPR_ATTR_UNUSED const RAIL_HANDSHAKE_EX_ORDER* serverHandshake)
+{
+	return xf_rail_server_handshake(rail, nullptr);
+}
+
 int xf_rail_init(xfContext* xfc, RailClientContext* rail)
 {
 	rdpContext* context = (rdpContext*)xfc;
@@ -1417,6 +1448,8 @@ int xf_rail_init(xfContext* xfc, RailClientContext* rail)
 	xfc->rail = rail;
 	xf_rail_register_update_callbacks(context->update);
 	rail->custom = (void*)xfc;
+	rail->ServerHandshake = xf_rail_server_handshake;
+	rail->ServerHandshakeEx = xf_rail_server_handshake_ex;
 	rail->ServerExecuteResult = xf_rail_server_execute_result;
 	rail->ServerSystemParam = xf_rail_server_system_param;
 	rail->ServerLocalMoveSize = xf_rail_server_local_move_size;

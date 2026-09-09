@@ -19,7 +19,7 @@ UINT client_rail_server_start_cmd(RailClientContext* context)
 	RAIL_CLIENT_STATUS_ORDER clientStatus = { .flags = freerdp_settings_get_uint32(
 		                                          settings, FreeRDP_RemoteAppFeatureFlags) };
 
-	if (freerdp_settings_get_bool(settings, FreeRDP_AutoReconnectionEnabled))
+	if (freerdp_settings_get_bool(settings, FreeRDP_SessionHasBeenReconnected))
 		clientStatus.flags |= TS_RAIL_CLIENTSTATUS_AUTORECONNECT;
 	else
 		clientStatus.flags &= ~TS_RAIL_CLIENTSTATUS_AUTORECONNECT;
@@ -62,6 +62,10 @@ UINT client_rail_server_start_cmd(RailClientContext* context)
 
 	if (status != CHANNEL_RC_OK)
 		return status;
+
+	/* Reannounce client settings after reconnect, but keep the existing app. */
+	if (freerdp_settings_get_bool(settings, FreeRDP_SessionHasBeenReconnected))
+		return CHANNEL_RC_OK;
 
 	const char* RemoteApplicationFile =
 	    freerdp_settings_get_string(settings, FreeRDP_RemoteApplicationFile);

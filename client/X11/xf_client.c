@@ -62,6 +62,7 @@
 #include <string.h>
 #include <termios.h>
 #include <pthread.h>
+#include <time.h>
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/select.h>
@@ -1570,6 +1571,32 @@ static BOOL handle_window_events(freerdp* instance)
 	return TRUE;
 }
 
+/* CLOCK_BOOTTIME includes host suspend; CLOCK_MONOTONIC does not. A local
+ * port forwarder can keep the client socket alive after the server has dropped
+ * its connection, so transport errors alone cannot reliably detect resume. */
+static BOOL xf_client_resumed(INT64* suspendOffset)
+{
+#if defined(CLOCK_BOOTTIME)
+	struct timespec boot = { 0 };
+	struct timespec monotonic = { 0 };
+	if ((clock_gettime(CLOCK_BOOTTIME, &boot) != 0) ||
+	    (clock_gettime(CLOCK_MONOTONIC, &monotonic) != 0))
+	{
+		*suspendOffset = -1;
+		return FALSE;
+	}
+
+	const INT64 offset = ((INT64)boot.tv_sec - (INT64)monotonic.tv_sec) * 1000 +
+	                     ((INT64)boot.tv_nsec - (INT64)monotonic.tv_nsec) / 1000000;
+	const BOOL resumed = (*suspendOffset >= 0) && (offset - *suspendOffset >= 1000);
+	*suspendOffset = offset;
+	return resumed;
+#else
+	WINPR_UNUSED(suspendOffset);
+	return FALSE;
+#endif
+}
+
 /** Main loop for the rdp connection.
  *  It will be run from the thread's entry point (thread_func()).
  *  It initiates the connection, and will continue to run until the session ends,
@@ -1583,6 +1610,8 @@ static DWORD WINAPI xf_client_thread(LPVOID param)
 	DWORD exit_code = 0;
 	DWORD waitStatus = 0;
 	HANDLE inputEvent = nullptr;
+	INT64 suspendOffset = -1;
+	BOOL monitorResume = FALSE;
 
 	freerdp* instance = (freerdp*)param;
 	WINPR_ASSERT(instance);
@@ -1628,6 +1657,11 @@ static DWORD WINAPI xf_client_thread(LPVOID param)
 	}
 
 	inputEvent = xfc->x11event;
+#if defined(CLOCK_BOOTTIME)
+	monitorResume = freerdp_settings_get_bool(settings, FreeRDP_AutoReconnectionEnabled);
+	if (monitorResume)
+		(void)xf_client_resumed(&suspendOffset);
+#endif
 
 	while (!freerdp_shall_disconnect_context(instance->context))
 	{
@@ -1662,18 +1696,28 @@ static DWORD WINAPI xf_client_thread(LPVOID param)
 		if (xfc->window)
 			xf_floatbar_hide_and_show(xfc->window->floatbar);
 
+		const DWORD idleTimeout = monitorResume ? 1000 : INFINITE;
 		waitStatus = WaitForMultipleObjects(
 		    nCount, handles, FALSE,
-		    xf_rail_has_pending_positions(xfc) ? XF_RAIL_POSITION_INTERVAL_MS : INFINITE);
+		    xf_rail_has_pending_positions(xfc) ? XF_RAIL_POSITION_INTERVAL_MS : idleTimeout);
 
 		if (waitStatus == WAIT_FAILED)
 			break;
 
 		{
-			if (!freerdp_check_event_handles(context))
+			/* Process queued server disconnect reasons before considering recovery. */
+			const BOOL connected = freerdp_check_event_handles(context);
+			const BOOL resumed = monitorResume && xf_client_resumed(&suspendOffset);
+			if (resumed)
+				WLog_INFO(TAG, "Host resumed from suspend; reconnecting the RDP transport");
+			if (!connected || resumed)
 			{
 				if (client_auto_reconnect_ex(instance, handle_window_events))
+				{
+					if (monitorResume)
+						(void)xf_client_resumed(&suspendOffset);
 					continue;
+				}
 				else
 				{
 					/*
