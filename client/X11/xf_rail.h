@@ -20,6 +20,7 @@
 #ifndef FREERDP_CLIENT_X11_RAIL_H
 #define FREERDP_CLIENT_X11_RAIL_H
 
+#include <freerdp/settings.h>
 #include <freerdp/client/rail.h>
 
 #include <X11/X.h>
@@ -125,6 +126,19 @@ typedef struct xf_app_window xfAppWindow;
 typedef struct xf_rail_icon_cache xfRailIconCache;
 
 #define XF_RAIL_POSITION_INTERVAL_MS 16
+
+/**
+ * RemoteApp uses three coordinate systems:
+ *  - X11 root window coordinates (xfAppWindow::x/y),
+ *  - RAIL screen coordinates (window orders, window move, local move/size, work area),
+ *    relative to the remote primary monitor at 0/0, so they can be negative,
+ *  - RDP desktop coordinates (framebuffer, pointer input), relative to the top left corner
+ *    of the bounding rectangle of the monitors sent to the server.
+ *
+ * The functions below return the X11 root position of the origin of the latter two.
+ */
+void xf_rail_get_screen_origin(const rdpSettings* settings, INT32* x, INT32* y);
+void xf_rail_get_desktop_origin(const rdpSettings* settings, INT32* x, INT32* y);
 
 BOOL xf_rail_paint(xfContext* xfc, const RECTANGLE_16* rect);
 BOOL xf_rail_paint_surface(xfContext* xfc, UINT64 windowId, const RECTANGLE_16* rect);

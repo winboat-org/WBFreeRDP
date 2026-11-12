@@ -403,6 +403,16 @@ static BOOL xf_event_VisibilityNotify(xfContext* xfc, const XVisibilityEvent* ev
 	return TRUE;
 }
 
+/* RemoteApp pointer input is relative to the server desktop, not to the X11 root window */
+static void xf_event_root_to_rail_desktop(xfContext* xfc, int* x, int* y)
+{
+	INT32 ox = 0;
+	INT32 oy = 0;
+	xf_rail_get_desktop_origin(xfc->common.context.settings, &ox, &oy);
+	*x -= ox;
+	*y -= oy;
+}
+
 BOOL xf_generic_MotionNotify_(xfContext* xfc, int x, int y, Window window, BOOL app,
                               const char* file, const char* fkt, size_t line)
 {
@@ -427,6 +437,7 @@ BOOL xf_generic_MotionNotify_(xfContext* xfc, int x, int y, Window window, BOOL 
 		/* Translate to desktop coordinates */
 		XTranslateCoordinates(xfc->display, window, RootWindowOfScreen(xfc->screen), x, y, &x, &y,
 		                      &childWindow);
+		xf_event_root_to_rail_desktop(xfc, &x, &y);
 	}
 
 	xf_event_adjust_coordinates(xfc, &x, &y);
@@ -535,6 +546,7 @@ BOOL xf_generic_ButtonEvent_(xfContext* xfc, int x, int y, int button, Window wi
 				/* Translate to desktop coordinates */
 				XTranslateCoordinates(xfc->display, window, RootWindowOfScreen(xfc->screen), x, y,
 				                      &x, &y, &childWindow);
+				xf_event_root_to_rail_desktop(xfc, &x, &y);
 			}
 
 			xf_event_adjust_coordinates(xfc, &x, &y);
