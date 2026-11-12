@@ -1067,8 +1067,20 @@ BOOL xf_AppWindowCreate(xfContext* xfc, xfAppWindow* appWindow)
 	settings = xfc->common.context.settings;
 	WINPR_ASSERT(settings);
 
+	/* The position is in RAIL screen coordinates, clip it in desktop coordinates (vscreen)
+	 * and then translate it to X11 root coordinates. */
+	INT32 sx = 0;
+	INT32 sy = 0;
+	INT32 dx = 0;
+	INT32 dy = 0;
+	xf_rail_get_screen_origin(settings, &sx, &sy);
+	xf_rail_get_desktop_origin(settings, &dx, &dy);
+	appWindow->x += sx - dx;
+	appWindow->y += sy - dy;
 	xf_FixWindowCoordinates(xfc, &appWindow->x, &appWindow->y, &appWindow->width,
 	                        &appWindow->height);
+	appWindow->x += dx;
+	appWindow->y += dy;
 	appWindow->shmid = -1;
 	appWindow->decorations = FALSE;
 	appWindow->fullscreen = FALSE;
@@ -1515,14 +1527,24 @@ void xf_UpdateWindowArea(xfContext* xfc, xfAppWindow* appWindow, int x, int y, i
 		return;
 	}
 
-	ax = x + appWindow->windowOffsetX;
-	ay = y + appWindow->windowOffsetY;
+	/* The framebuffer is in desktop coordinates, the window offset in screen coordinates */
+	INT32 sx = 0;
+	INT32 sy = 0;
+	INT32 dx = 0;
+	INT32 dy = 0;
+	xf_rail_get_screen_origin(settings, &sx, &sy);
+	xf_rail_get_desktop_origin(settings, &dx, &dy);
+	const int wx = appWindow->windowOffsetX + sx - dx;
+	const int wy = appWindow->windowOffsetY + sy - dy;
 
-	if (ax + width > appWindow->windowOffsetX + appWindow->width)
-		width = (appWindow->windowOffsetX + appWindow->width - 1) - ax;
+	ax = x + wx;
+	ay = y + wy;
 
-	if (ay + height > appWindow->windowOffsetY + appWindow->height)
-		height = (appWindow->windowOffsetY + appWindow->height - 1) - ay;
+	if (ax + width > wx + appWindow->width)
+		width = (wx + appWindow->width - 1) - ax;
+
+	if (ay + height > wy + appWindow->height)
+		height = (wy + appWindow->height - 1) - ay;
 
 	if (freerdp_settings_get_bool(settings, FreeRDP_SoftwareGdi))
 	{

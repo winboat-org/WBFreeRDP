@@ -1773,7 +1773,10 @@ BOOL freerdp_settings_enforce_monitor_exists(rdpSettings* settings)
 	const UINT32 count = freerdp_settings_get_uint32(settings, FreeRDP_MonitorCount);
 	const BOOL fullscreen = freerdp_settings_get_bool(settings, FreeRDP_Fullscreen);
 	const BOOL multimon = freerdp_settings_get_bool(settings, FreeRDP_UseMultimon);
-	const BOOL useMonitors = fullscreen || multimon;
+	/* RemoteApp windows are placed relative to the selected monitor, keep it (and with it
+	 * FreeRDP_MonitorLocalShiftX/FreeRDP_MonitorLocalShiftY) */
+	const BOOL remoteApp = freerdp_settings_get_bool(settings, FreeRDP_RemoteApplicationMode);
+	const BOOL useMonitors = fullscreen || multimon || remoteApp;
 
 	const UINT32 size = freerdp_settings_get_uint32(settings, FreeRDP_MonitorDefArraySize);
 	if (size == 0)

@@ -33,6 +33,7 @@
 #include <freerdp/client/rail.h>
 
 #include "xf_window.h"
+#include "xf_event.h"
 #include "xf_rail.h"
 #include "xf_utils.h"
 
@@ -116,6 +117,17 @@ BOOL xf_rail_enable_remoteapp_mode(xfContext* xfc)
 		rdpGdi* gdi = xfc->common.context.gdi;
 		WINPR_ASSERT(gdi);
 
+		INT32 sx = 0;
+		INT32 sy = 0;
+		INT32 dx = 0;
+		INT32 dy = 0;
+		xf_rail_get_screen_origin(xfc->common.context.settings, &sx, &sy);
+		xf_rail_get_desktop_origin(xfc->common.context.settings, &dx, &dy);
+		WLog_Print(xfc->log, WLOG_DEBUG,
+		           "RemoteApp origins in X11 root: screen %" PRId32 "x%" PRId32 ", desktop %" PRId32
+		           "x%" PRId32,
+		           sx, sy, dx, dy);
+
 		const BOOL old = gdi->suppressOutput;
 		gdi->suppressOutput = TRUE;
 		xfc->remote_app = TRUE;
@@ -152,26 +164,106 @@ BOOL xf_rail_disable_remoteapp_mode(xfContext* xfc)
 	return TRUE;
 }
 
+/* The server only knows the client monitor layout if it was sent, see gcc.c */
+static BOOL xf_rail_server_has_monitor_layout(const rdpSettings* settings)
+{
+	return freerdp_settings_get_bool(settings, FreeRDP_UseMultimon) &&
+	       !freerdp_settings_get_bool(settings, FreeRDP_SpanMonitors) &&
+	       (freerdp_settings_get_uint32(settings, FreeRDP_MonitorCount) > 1);
+}
+
+void xf_rail_get_desktop_origin(const rdpSettings* settings, INT32* x, INT32* y)
+{
+	WINPR_ASSERT(settings);
+	WINPR_ASSERT(x);
+	WINPR_ASSERT(y);
+
+	/* FreeRDP_MonitorDefArray is relative to the primary monitor, which is located at
+	 * FreeRDP_MonitorLocalShiftX/FreeRDP_MonitorLocalShiftY in X11 root coordinates. */
+	INT32 left = 0;
+	INT32 top = 0;
+	const UINT32 count = freerdp_settings_get_uint32(settings, FreeRDP_MonitorCount);
+	for (UINT32 i = 0; i < count; i++)
+	{
+		const rdpMonitor* monitor =
+		    freerdp_settings_get_pointer_array(settings, FreeRDP_MonitorDefArray, i);
+		if (!monitor)
+			break;
+		if ((i == 0) || (monitor->x < left))
+			left = monitor->x;
+		if ((i == 0) || (monitor->y < top))
+			top = monitor->y;
+	}
+
+	*x = freerdp_settings_get_int32(settings, FreeRDP_MonitorLocalShiftX) + left;
+	*y = freerdp_settings_get_int32(settings, FreeRDP_MonitorLocalShiftY) + top;
+}
+
+void xf_rail_get_screen_origin(const rdpSettings* settings, INT32* x, INT32* y)
+{
+	WINPR_ASSERT(settings);
+	WINPR_ASSERT(x);
+	WINPR_ASSERT(y);
+
+	/* Without a monitor layout the server desktop is a single monitor at 0/0 */
+	if (!xf_rail_server_has_monitor_layout(settings))
+	{
+		xf_rail_get_desktop_origin(settings, x, y);
+		return;
+	}
+
+	*x = freerdp_settings_get_int32(settings, FreeRDP_MonitorLocalShiftX);
+	*y = freerdp_settings_get_int32(settings, FreeRDP_MonitorLocalShiftY);
+}
+
 /* Report the real work area so the server maximizes RemoteApp windows within the panel. */
 static UINT xf_rail_send_workarea(xfContext* xfc)
 {
 	WINPR_ASSERT(xfc);
 	WINPR_ASSERT(xfc->rail);
 
+	const rdpSettings* settings = xfc->common.context.settings;
+	WINPR_ASSERT(settings);
+
 	/* xf_GetWorkArea overwrites xfc->workArea; restore it (RAIL keeps it full). */
 	const xfWorkArea saved = xfc->workArea;
 	if (!xf_GetWorkArea(xfc))
 		return CHANNEL_RC_OK;
-	const INT64 right = (INT64)xfc->workArea.x + xfc->workArea.width;
-	const INT64 bottom = (INT64)xfc->workArea.y + xfc->workArea.height;
+	const xfWorkArea area = xfc->workArea;
+	xfc->workArea = saved;
+
+	/* The server applies the work area to a single monitor. _NET_WORKAREA spans all
+	 * outputs, so restrict it to the primary monitor and send it in screen coordinates. */
+	INT32 ox = 0;
+	INT32 oy = 0;
+	xf_rail_get_screen_origin(settings, &ox, &oy);
+
+	INT64 pwidth = freerdp_settings_get_uint32(settings, FreeRDP_DesktopWidth);
+	INT64 pheight = freerdp_settings_get_uint32(settings, FreeRDP_DesktopHeight);
+	if (xf_rail_server_has_monitor_layout(settings))
+	{
+		const rdpMonitor* primary =
+		    freerdp_settings_get_pointer_array(settings, FreeRDP_MonitorDefArray, 0);
+		if (!primary)
+			return CHANNEL_RC_OK;
+		pwidth = primary->width;
+		pheight = primary->height;
+	}
+
+	const INT64 left = MAX(0, (INT64)area.x - ox);
+	const INT64 top = MAX(0, (INT64)area.y - oy);
+	const INT64 right = MIN(pwidth, (INT64)area.x + area.width - ox);
+	const INT64 bottom = MIN(pheight, (INT64)area.y + area.height - oy);
+	if ((right <= left) || (bottom <= top) || (right > UINT16_MAX) || (bottom > UINT16_MAX))
+		return CHANNEL_RC_OK;
+
 	const RAIL_SYSPARAM_ORDER sysparam = {
 		.params = SPI_MASK_SET_WORK_AREA,
-		.workArea.left = WINPR_CXX_COMPAT_CAST(UINT16, xfc->workArea.x),
-		.workArea.top = WINPR_CXX_COMPAT_CAST(UINT16, xfc->workArea.y),
+		.workArea.left = WINPR_CXX_COMPAT_CAST(UINT16, left),
+		.workArea.top = WINPR_CXX_COMPAT_CAST(UINT16, top),
 		.workArea.right = WINPR_CXX_COMPAT_CAST(UINT16, right),
 		.workArea.bottom = WINPR_CXX_COMPAT_CAST(UINT16, bottom)
 	};
-	xfc->workArea = saved;
 	return xfc->rail->ClientSystemParam(xfc->rail, &sysparam);
 }
 
@@ -212,9 +304,36 @@ BOOL xf_rail_send_client_system_command(xfContext* xfc, UINT64 windowId, UINT16 
 	return rc == CHANNEL_RC_OK;
 }
 
+/* Convert the X11 root position of a window to RAIL screen coordinates */
+static void xf_rail_window_screen_position(const xfAppWindow* window, INT32* x, INT32* y)
+{
+	WINPR_ASSERT(window);
+	WINPR_ASSERT(window->xfc);
+
+	INT32 ox = 0;
+	INT32 oy = 0;
+	xf_rail_get_screen_origin(window->xfc->common.context.settings, &ox, &oy);
+	*x = window->x - ox;
+	*y = window->y - oy;
+}
+
+/* Move the X11 window to the geometry last reported by the server */
+static void xf_rail_move_to_server_geometry(xfContext* xfc, xfAppWindow* window)
+{
+	INT32 ox = 0;
+	INT32 oy = 0;
+	xf_rail_get_screen_origin(xfc->common.context.settings, &ox, &oy);
+	xf_MoveWindow(xfc, window, window->windowOffsetX + ox, window->windowOffsetY + oy,
+	              WINPR_ASSERTING_INT_CAST(int, window->windowWidth),
+	              WINPR_ASSERTING_INT_CAST(int, window->windowHeight));
+}
+
 static BOOL xf_rail_geometry_matches_server(const xfAppWindow* window)
 {
-	return window->x == window->windowOffsetX && window->y == window->windowOffsetY &&
+	INT32 x = 0;
+	INT32 y = 0;
+	xf_rail_window_screen_position(window, &x, &y);
+	return x == window->windowOffsetX && y == window->windowOffsetY &&
 	       window->width == (INT64)window->windowWidth &&
 	       window->height == (INT64)window->windowHeight;
 }
@@ -265,15 +384,17 @@ static BOOL xf_rail_adjust_position(xfContext* xfc, xfAppWindow* appWindow)
 		const INT16 right = WINPR_ASSERTING_INT_CAST(INT16, appWindow->resizeMarginRight);
 		const INT16 top = WINPR_ASSERTING_INT_CAST(INT16, appWindow->resizeMarginTop);
 		const INT16 bottom = WINPR_ASSERTING_INT_CAST(INT16, appWindow->resizeMarginBottom);
-		windowMove.left = WINPR_ASSERTING_INT_CAST(INT16, appWindow->x - left);
-		windowMove.top = WINPR_ASSERTING_INT_CAST(INT16, appWindow->y - top);
-		windowMove.right = WINPR_ASSERTING_INT_CAST(INT16, appWindow->x + appWindow->width + right);
-		windowMove.bottom =
-		    WINPR_ASSERTING_INT_CAST(INT16, appWindow->y + appWindow->height + bottom);
+		INT32 x = 0;
+		INT32 y = 0;
+		xf_rail_window_screen_position(appWindow, &x, &y);
+		windowMove.left = WINPR_ASSERTING_INT_CAST(INT16, x - left);
+		windowMove.top = WINPR_ASSERTING_INT_CAST(INT16, y - top);
+		windowMove.right = WINPR_ASSERTING_INT_CAST(INT16, x + appWindow->width + right);
+		windowMove.bottom = WINPR_ASSERTING_INT_CAST(INT16, y + appWindow->height + bottom);
 		appWindow->geometryInFlight = TRUE;
 		appWindow->geometrySentAt = GetTickCount64();
-		appWindow->requestedX = appWindow->x;
-		appWindow->requestedY = appWindow->y;
+		appWindow->requestedX = x;
+		appWindow->requestedY = y;
 		appWindow->requestedWidth = appWindow->width;
 		appWindow->requestedHeight = appWindow->height;
 		const UINT rc = xfc->rail->ClientWindowMove(xfc->rail, &windowMove);
@@ -334,8 +455,7 @@ void xf_rail_check_pending_positions(xfContext* xfc)
 			window->geometryInFlight = FALSE;
 			if (!window->geometryPending && window->local_move.state == LMS_NOT_ACTIVE &&
 			    !xf_rail_is_maximized(window) && window->showState != WINDOW_SHOW_MINIMIZED)
-				xf_MoveWindow(xfc, window, window->windowOffsetX, window->windowOffsetY,
-				              (int)window->windowWidth, (int)window->windowHeight);
+				xf_rail_move_to_server_geometry(xfc, window);
 		}
 		/* Keep one server geometry request outstanding and send the newest local bounds. */
 		if (window->geometryPending && !window->geometryInFlight &&
@@ -386,11 +506,14 @@ BOOL xf_rail_end_local_move(xfContext* xfc, xfAppWindow* appWindow)
 		const INT16 bottom = WINPR_ASSERTING_INT_CAST(INT16, appWindow->resizeMarginBottom);
 		const INT16 w = WINPR_ASSERTING_INT_CAST(INT16, appWindow->width + right);
 		const INT16 h = WINPR_ASSERTING_INT_CAST(INT16, appWindow->height + bottom);
-		windowMove.left = WINPR_ASSERTING_INT_CAST(INT16, appWindow->x - left);
-		windowMove.top = WINPR_ASSERTING_INT_CAST(INT16, appWindow->y - top);
-		windowMove.right = WINPR_ASSERTING_INT_CAST(INT16, appWindow->x + w); /* In the update to
+		INT32 sx = 0;
+		INT32 sy = 0;
+		xf_rail_window_screen_position(appWindow, &sx, &sy);
+		windowMove.left = WINPR_ASSERTING_INT_CAST(INT16, sx - left);
+		windowMove.top = WINPR_ASSERTING_INT_CAST(INT16, sy - top);
+		windowMove.right = WINPR_ASSERTING_INT_CAST(INT16, sx + w); /* In the update to
 		           RDP the position is one past the window */
-		windowMove.bottom = WINPR_ASSERTING_INT_CAST(INT16, appWindow->y + h);
+		windowMove.bottom = WINPR_ASSERTING_INT_CAST(INT16, sy + h);
 		const UINT rc = xfc->rail->ClientWindowMove(xfc->rail, &windowMove);
 		if (rc != CHANNEL_RC_OK)
 			return FALSE;
@@ -406,6 +529,12 @@ BOOL xf_rail_end_local_move(xfContext* xfc, xfAppWindow* appWindow)
 	if ((appWindow->local_move.direction != NET_WM_MOVERESIZE_MOVE_KEYBOARD) &&
 	    (appWindow->local_move.direction != NET_WM_MOVERESIZE_SIZE_KEYBOARD))
 	{
+		INT32 ox = 0;
+		INT32 oy = 0;
+		xf_rail_get_desktop_origin(xfc->common.context.settings, &ox, &oy);
+		x -= ox;
+		y -= oy;
+		xf_event_adjust_coordinates(xfc, &x, &y);
 		if (!freerdp_client_send_button_event(&xfc->common, FALSE, PTR_FLAGS_BUTTON1, x, y))
 			return FALSE;
 	}
@@ -415,8 +544,7 @@ BOOL xf_rail_end_local_move(xfContext* xfc, xfAppWindow* appWindow)
 	 * we can start to receive GDI orders for the new window dimensions before we
 	 * receive the RAIL ORDER for the new window size.  This avoids that race condition.
 	 */
-	appWindow->windowOffsetX = appWindow->x;
-	appWindow->windowOffsetY = appWindow->y;
+	xf_rail_window_screen_position(appWindow, &appWindow->windowOffsetX, &appWindow->windowOffsetY);
 	appWindow->windowWidth = WINPR_ASSERTING_INT_CAST(uint32_t, appWindow->width);
 	appWindow->windowHeight = WINPR_ASSERTING_INT_CAST(uint32_t, appWindow->height);
 	appWindow->local_move.state = LMS_TERMINATING;
@@ -432,11 +560,23 @@ BOOL xf_rail_paint_surface(xfContext* xfc, UINT64 windowId, const RECTANGLE_16* 
 	if (!appWindow)
 		return FALSE;
 
+	/* The framebuffer is in desktop coordinates, the server window position in screen
+	 * coordinates. */
+	const rdpSettings* settings = xfc->common.context.settings;
+	INT32 sx = 0;
+	INT32 sy = 0;
+	INT32 dx = 0;
+	INT32 dy = 0;
+	xf_rail_get_screen_origin(settings, &sx, &sy);
+	xf_rail_get_desktop_origin(settings, &dx, &dy);
+	const INT32 wx = appWindow->windowOffsetX + sx - dx;
+	const INT32 wy = appWindow->windowOffsetY + sy - dy;
+
 	const RECTANGLE_16 windowRect = {
-		.left = WINPR_ASSERTING_INT_CAST(UINT16, MAX(appWindow->x, 0)),
-		.top = WINPR_ASSERTING_INT_CAST(UINT16, MAX(appWindow->y, 0)),
-		.right = WINPR_ASSERTING_INT_CAST(UINT16, MAX(appWindow->x + appWindow->width, 0)),
-		.bottom = WINPR_ASSERTING_INT_CAST(UINT16, MAX(appWindow->y + appWindow->height, 0))
+		.left = WINPR_ASSERTING_INT_CAST(UINT16, MAX(wx, 0)),
+		.top = WINPR_ASSERTING_INT_CAST(UINT16, MAX(wy, 0)),
+		.right = WINPR_ASSERTING_INT_CAST(UINT16, MAX(wx + appWindow->width, 0)),
+		.bottom = WINPR_ASSERTING_INT_CAST(UINT16, MAX(wy + appWindow->height, 0))
 	};
 
 	REGION16 windowInvalidRegion = WINPR_C_ARRAY_INIT;
@@ -451,10 +591,10 @@ BOOL xf_rail_paint_surface(xfContext* xfc, UINT64 windowId, const RECTANGLE_16* 
 		const RECTANGLE_16* extents = region16_extents(&windowInvalidRegion);
 
 		const RECTANGLE_16 updateRect = {
-			.left = WINPR_ASSERTING_INT_CAST(UINT16, extents->left - appWindow->x),
-			.top = WINPR_ASSERTING_INT_CAST(UINT16, extents->top - appWindow->y),
-			.right = WINPR_ASSERTING_INT_CAST(UINT16, extents->right - appWindow->x),
-			.bottom = WINPR_ASSERTING_INT_CAST(UINT16, extents->bottom - appWindow->y)
+			.left = WINPR_ASSERTING_INT_CAST(UINT16, extents->left - wx),
+			.top = WINPR_ASSERTING_INT_CAST(UINT16, extents->top - wy),
+			.right = WINPR_ASSERTING_INT_CAST(UINT16, extents->right - wx),
+			.bottom = WINPR_ASSERTING_INT_CAST(UINT16, extents->bottom - wy)
 		};
 
 		/* Only a desktop paint establishes that the primary buffer contains
@@ -788,9 +928,7 @@ static BOOL xf_rail_window_common(rdpContext* context, const WINDOW_ORDER_INFO* 
 			}
 			else
 			{
-				xf_MoveWindow(xfc, appWindow, appWindow->windowOffsetX, appWindow->windowOffsetY,
-				              WINPR_ASSERTING_INT_CAST(int, appWindow->windowWidth),
-				              WINPR_ASSERTING_INT_CAST(int, appWindow->windowHeight));
+				xf_rail_move_to_server_geometry(xfc, appWindow);
 			}
 
 			/* Show a maximized window fully; its frame-inset visibility rects would clip it. */
@@ -1342,6 +1480,16 @@ static UINT xf_rail_server_local_move_size(RailClientContext* context,
 			break;
 		default:
 			break;
+	}
+
+	/* Except for RAIL_WMSZ_MOVE the position is in screen coordinates */
+	if (localMoveSize->moveSizeType != RAIL_WMSZ_MOVE)
+	{
+		INT32 ox = 0;
+		INT32 oy = 0;
+		xf_rail_get_screen_origin(xfc->common.context.settings, &ox, &oy);
+		x += ox;
+		y += oy;
 	}
 
 	if (localMoveSize->isMoveSizeStart)
